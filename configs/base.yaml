@@ -1,0 +1,53 @@
+# Config composition
+defaults:
+  - _self_
+  - dataset                         # Load dataset settings from dataset.yaml
+  - models/${model.identifier}      # Dynamically load the model-specific YAML file
+  - override hydra/job_logging: disabled  
+  - override hydra/hydra_logging: disabled
+
+# ----------------------------
+# Default Model Configuration
+# ----------------------------
+model:
+  identifier: "yolo"  # Default model to use (can be overridden via CLI)
+
+# ----------------------------
+# Experiment Configuration
+# ----------------------------
+exp:
+  seed: 42                          # Random seed for reproducibility
+  device: cuda                      # Computing device: ['cpu', 'mps', 'cuda']
+  on_server: false                  # Whether the script is running on a server
+  mode: train                       # Running mode: ['train', 'crossval', 'test', 'predict']
+
+  number: 0                         # Experiment number for tracking different runs
+  name: default                     # Experiment name for logging and model saving
+  save_name: null                   # Custom name for saving model/predictions (if specified)
+
+# ----------------------------
+# Paths Configuration
+# ----------------------------
+path:
+  project_root_dir: '/Volumes/Works/Projects/SOTA-Detection-Lab'  # Absolute path to the project directory
+  
+  dataset_root_dir:                         # Dataset location (relative to project_root_dir or absolute for servers)
+    local: './data'                         # Local dataset folder inside the project directory
+    server: '../datasets/object_detection'  # Dataset location on the server (one directory above project)
+
+  input_dir: experiments/input              # Directory for input experiment files
+  output_dir: experiments/output/${model.identifier}  # Directory for model-specific outputs
+  custom_splits_dir: ${path.input_dir}/custom_splits  # Directory for custom dataset splits
+  
+  predict_image_folder: null                # Folder containing images for prediction (set dynamically)
+  temp_dataset_path: null                   # Temporary storage for dataset preprocessing
+
+# ----------------------------
+# Hydra Configuration
+# ----------------------------
+hydra:
+  run:
+    dir: .              # Run Hydra in the current working directory
+  output_subdir: null   # Prevent Hydra from creating an additional output directory
+  job:
+    chdir: false        # Prevent changing the working directory within Hydra

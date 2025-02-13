@@ -24,6 +24,7 @@ SOTA-Detection-Lab/
 │   │   ├── centernet.yaml
 │   │   ├── efficientdet.yaml
 │   │   ├── detr.yaml
+│   │   ├── yolo.yaml
 │
 │── models/                        # Each model has its own build, train, evaluate functions
 │   ├── __init__.py
