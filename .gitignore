@@ -12,6 +12,11 @@ env/
 *.venv
 *.env
 
+# outputs
+experiments/
+results/
+
+
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
@@ -23,7 +28,6 @@ nohup.out
 
 # Data & datasets
 data/
-datasets/
 *.csv
 *.json
 *.xml
