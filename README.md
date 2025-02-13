@@ -18,13 +18,11 @@
 SOTA-Detection-Lab/
 │── configs/
 │   ├── base.yaml                  # Global configuration
-│   ├── dataset.yaml               # Dataset configurations
-│   ├── models/                    # Model-specific configurations
-│   │   ├── faster_rcnn.yaml
-│   │   ├── centernet.yaml
-│   │   ├── efficientdet.yaml
-│   │   ├── detr.yaml
-│   │   ├── yolo.yaml
+│   ├── faster_rcnn.yaml
+│   ├── centernet.yaml
+│   ├── efficientdet.yaml
+│   ├── detr.yaml
+│   ├── yolo.yaml
 │
 │── models/                        # Each model has its own build, train, evaluate functions
 │   ├── __init__.py

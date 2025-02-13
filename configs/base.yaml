@@ -1,16 +1,10 @@
 # Config composition
 defaults:
   - _self_
-  - dataset                         # Load dataset settings from dataset.yaml
-  - models/${model.identifier}      # Dynamically load the model-specific YAML file
+  - model: yolo
   - override hydra/job_logging: disabled  
   - override hydra/hydra_logging: disabled
 
-# ----------------------------
-# Default Model Configuration
-# ----------------------------
-model:
-  identifier: "yolo"  # Default model to use (can be overridden via CLI)
 
 # ----------------------------
 # Experiment Configuration
@@ -24,6 +18,27 @@ exp:
   number: 0                         # Experiment number for tracking different runs
   name: default                     # Experiment name for logging and model saving
   save_name: null                   # Custom name for saving model/predictions (if specified)
+
+
+# ----------------------------
+# Dataset Configuration
+# ----------------------------
+data:
+  folder: coco8                    # Name of the dataset folder (relative to dataset_root_dir)
+  single_class: true               # If true, treats the dataset as a single-class detection task
+
+  # Dataset Splitting
+  split_ratios: [0.8, 0.2, 0.0]    # Ratios for train, validation, and test splits (should sum to 1.0)
+  split_code: null                 # Custom split identifier (e.g., to reference a specific split configuration)
+  test_split: val                  # Partition to be used for evaluation: ['val', 'test']
+
+  # Cross-Validation Settings
+  num_folds: 3                     # Number of folds for cross-validation
+  use_replacement: false           # Whether to use replacement in cross-validation sampling
+
+  # Data Augmentation Settings
+  use_augmentation: false          # If true, applies data augmentation techniques during training
+
 
 # ----------------------------
 # Paths Configuration
@@ -41,6 +56,7 @@ path:
   
   predict_image_folder: null                # Folder containing images for prediction (set dynamically)
   temp_dataset_path: null                   # Temporary storage for dataset preprocessing
+
 
 # ----------------------------
 # Hydra Configuration
