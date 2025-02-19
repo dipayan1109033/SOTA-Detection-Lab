@@ -8,43 +8,55 @@ from omegaconf import DictConfig, OmegaConf
 
 
 
-def set_seeds(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # for multi-GPU setups
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+def set_seeds(seed, deterministic=True):
+    """Sets random seeds for reproducibility with optional determinism."""
+    random.seed(seed)                     # Set Python's built-in random module seed
+    np.random.seed(seed)                  # Set NumPy random seed
+    torch.manual_seed(seed)               # Set PyTorch seed for CPU operations
+    torch.cuda.manual_seed(seed)          # Set PyTorch seed for GPU operations (single-GPU)
+    torch.cuda.manual_seed_all(seed)      # Set PyTorch seed for all GPUs (multi-GPU setups)
+
+    torch.backends.cudnn.deterministic = deterministic  # Ensures reproducible operations if True (may slow down training)
+    torch.backends.cudnn.benchmark = not deterministic  # Enables faster training if True (less reproducible)
 
 def preprocessing(config, debug=False):
-    # Set random seeds for reproducibility
-    set_seeds(config.exp.seed)
+    """Prepares configuration by setting seeds, resolving paths, and generating an experiment name."""
+    print(f"Experiment Name: {config.exp.name}")
+    set_seeds(config.exp.seed, deterministic=config.train.deterministic)
 
-    # # Update dataset and project directory based on local/server
-    # if os.path.exists(config.path.project_root_dir.server):
-    #     config.exp.on_server = True
-    #     config.data.root_dir = config.data.root_dir.server
-    #     config.path.project_root_dir = config.path.project_root_dir.server
-    # else:
-    #     config.exp.on_server = False
-    #     config.data.root_dir = config.data.root_dir.local
-    #     config.path.project_root_dir = config.path.project_root_dir.local
+    # Determine if the script is running locally or on a server
+    if os.path.exists(config.path.project_root_dir):
+        config.exp.on_server = False    # Running locally
+        config.path.dataset_root_dir = os.path.abspath(
+            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir.local)
+        )
+    else:
+        config.exp.on_server = True    # Running on a server
+        config.path.project_root_dir = hydra.utils.get_original_cwd()  # Hydra-safe project root
+        config.path.dataset_root_dir = os.path.abspath(
+            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir.server)
+        )
 
-    # # Add few arguments
-    # if config.model.identifier == "yolo":
-    #     config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
-    # else:
-    #     config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}{config.model.code}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
+    # Generate a unique experiment name for saving models and logs
+    if config.model.identifier == "yolo":
+        config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
+    else:
+        config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}{config.model.code}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
 
+    # Print the final processed configuration if debug mode is enabled
     if debug: print(OmegaConf.to_yaml(config))
 
     return config
 
-@hydra.main(version_base=None, config_path="../configs", config_name="base")
+
+
+@hydra.main(version_base=None, config_path="../configs", config_name="default_config")
 def main(config: DictConfig):
-    print(f"Experiment Name: {config.exp.name}")
+    """Main script entry point."""
+
+    # Preprocess config settings before running the main pipeline
     config = preprocessing(config, debug=True)
+
     return
 
     # Load dataset

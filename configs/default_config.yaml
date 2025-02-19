@@ -2,8 +2,16 @@
 defaults:
   - _self_
   - model: yolo
+  - experiment
   - override hydra/job_logging: disabled  
   - override hydra/hydra_logging: disabled
+
+
+# ----------------------------
+# Model Configuration
+# ----------------------------
+model: 
+  saved_model_folder: null        # Save folder name for a previously trained model (set dynamically)
 
 
 # ----------------------------
@@ -17,36 +25,16 @@ exp:
 
   number: 0                         # Experiment number for tracking different runs
   name: default                     # Experiment name for logging and model saving
-  save_name: null                   # Custom name for saving model/predictions (if specified)
-
-
-# ----------------------------
-# Dataset Configuration
-# ----------------------------
-data:
-  folder: coco8                    # Name of the dataset folder (relative to dataset_root_dir)
-  single_class: true               # If true, treats the dataset as a single-class detection task
-
-  # Dataset Splitting
-  split_ratios: [0.8, 0.2, 0.0]    # Ratios for train, validation, and test splits (should sum to 1.0)
-  split_code: null                 # Custom split identifier (e.g., to reference a specific split configuration)
-  test_split: val                  # Partition to be used for evaluation: ['val', 'test']
-
-  # Cross-Validation Settings
-  num_folds: 3                     # Number of folds for cross-validation
-  use_replacement: false           # Whether to use replacement in cross-validation sampling
-
-  # Data Augmentation Settings
-  use_augmentation: false          # If true, applies data augmentation techniques during training
+  save_name: null                   # Custom name used for saving model/prediction files - set dynamically
 
 
 # ----------------------------
 # Paths Configuration
 # ----------------------------
 path:
-  project_root_dir: '/Volumes/Works/Projects/SOTA-Detection-Lab'  # Absolute path to the project directory
+  project_root_dir: '/Volumes/Works/Projects/SOTA-Detection-Lab'  # Absolute path to the project directory - set dynamically for server
   
-  dataset_root_dir:                         # Dataset location (relative to project_root_dir or absolute for servers)
+  dataset_root_dir:                         # Dataset location (relative to project_root_dir) - set dynamically
     local: './data'                         # Local dataset folder inside the project directory
     server: '../datasets/object_detection'  # Dataset location on the server (one directory above project)
 
@@ -54,7 +42,7 @@ path:
   output_dir: experiments/output/${model.identifier}  # Directory for model-specific outputs
   custom_splits_dir: ${path.input_dir}/custom_splits  # Directory for custom dataset splits
   
-  predict_image_folder: null                # Folder containing images for prediction (set dynamically)
+  predict_image_folder: null                # Folder containing images for prediction
   temp_dataset_path: null                   # Temporary storage for dataset preprocessing
 
 

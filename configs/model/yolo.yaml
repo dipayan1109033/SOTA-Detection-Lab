@@ -7,23 +7,4 @@ img_size: 640                     # Input image size for the model (typically 41
 
 conf_threshold: 0.25              # Confidence threshold for filtering weak detections
 iou_threshold: 0.45               # Intersection over Union (IoU) threshold for Non-Maximum Suppression (NMS)
-yolo_trained_num: 0               # Save folder postfix number for a previously trained YOLO model
-
-
-# ----------------------------
-# Training Configuration for YOLO
-# ----------------------------
-train:
-  epoch: 100                        # Number of training epochs
-  batch_size: 16                    # Number of samples per batch
-  optimizer: SGD                    # Optimization algorithm (options: ['SGD', 'Adam'])
-  lr: 0.01                          # Initial learning rate
-  momentum: 0.937                   # Momentum factor (applicable for SGD)
-  freeze_layers: 0                  # Number of backbone layers to freeze during training
-
-  # Learning Rate Scheduler Configuration
-  scheduler:
-    type: OneCycleLR                # Learning rate scheduler type (options: ['StepLR', 'ExponentialLR', 'ReduceLROnPlateau', 'OneCycleLR'])
-    max_lr: 0.01                    # Maximum learning rate for OneCycleLR
-    div_factor: 25                  # Initial learning rate is max_lr / div_factor
-    final_div_factor: 1e4           # Final learning rate is max_lr / final_div_factor
+freeze_layers: 0                  # Number of backbone layers to freeze during training
