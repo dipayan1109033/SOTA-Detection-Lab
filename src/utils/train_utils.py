@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from src.utils.data_utils import *
+from utils.prepare_utils import *
 from src.utils.metrics import Evaluation_withCOCO, writeTo_csv_for_crossval
 
 

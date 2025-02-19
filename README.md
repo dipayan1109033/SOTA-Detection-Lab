@@ -15,41 +15,57 @@
 ## 📂 Project Structure
 
 ```plaintext
-SOTA-Detection-Lab/
-│── configs/
-│   ├── base.yaml                  # Global configuration
-│   ├── faster_rcnn.yaml
-│   ├── centernet.yaml
-│   ├── efficientdet.yaml
-│   ├── detr.yaml
-│   ├── yolo.yaml
+SOTA-DETECTION-LAB/
 │
-│── models/                        # Each model has its own build, train, evaluate functions
-│   ├── __init__.py
-│   ├── faster_rcnn.py             # Torchvision Faster R-CNN
-│   ├── yolov5.py                  # YOLOv5 from Ultralytics repo
-│   ├── centernet.py               # CenterNet from GitHub repo
-│   ├── efficientdet.py            # EfficientDet from different repo
-│   ├── detr.py                    # DETR model script
+├── configs/                           # Configuration files
+│   ├── model/                         # Model-specific configs
+│   │   ├── centernet.yaml
+│   │   ├── detr.yaml
+│   │   ├── faster_rcnn.yaml
+│   │   └── yolo.yaml
+│   ├── default_config.yaml            # Global/default configuration
+│   └── experiment.yaml                # Experiment-specific configuration
 │
-│── datasets/
-│   ├── __init__.py
-│   ├── dataset_loader.py          # Unified dataset loader (COCO, Pascal, etc.)
-│   ├── transforms.py              # Data augmentation utilities
+├── data/                              # Datasets
+│   ├── coco8/
+│   ├── coco128/
+│   └── VOC2007/
 │
-│── utils/
-│   ├── __init__.py
-│   ├── logging.py                 # Logging and tracking setup (e.g., TensorBoard, WandB)
-│   ├── common.py                  # Helper functions (e.g., model saving, metric calculations)
-│   ├── inference.py               # Unified inference pipeline (for model-agnostic inference)
+├── experiments/                       # Experiment data
+│   ├── input/                         # Input files for experiments
+│   └── output/                        # Output files (logs, results, checkpoints)
 │
-│── main.py                        # Entry point for selecting and running models
-│── requirements.txt               # Dependencies
-│── README.md                      # Documentation
+├── results/                           # Final results or evaluation outputs
 │
-│── scripts/
-│   ├── train.sh                   # Example script for training
-│   ├── evaluate.sh                # Example script for evaluation
+├── src/                               # Source code
+│   ├── data_prep/                     # Data preparation and preprocessing scripts
+│   │   ├── convert_dataset_formats.py # Convert between dataset formats (e.g., COCO to Pascal VOC)
+│   │   └── preprocess.py              # Preprocessing routines
+│   │
+│   ├── datasets/                      # Dataset processing utilities
+│   │   ├── dataset_loader.py          # Unified dataset loader
+│   │   └── transforms.py              # Data augmentation and preprocessing
+│   │
+│   ├── models/                        # Model implementations
+│   │   ├── centernet.py               # CenterNet model
+│   │   ├── faster_rcnn.py             # Faster R-CNN model
+│   │   └── yolo.py                    # YOLO model
+│   │
+│   └── utils/                         # Utility scripts
+│       ├── common.py                  # General helper functions
+│       ├── data_utils.py              # Dataset-related utilities
+│       ├── dataset_utils.py           # Additional dataset processing helpers
+│       ├── inference.py               # Unified inference pipeline
+│       └── train_utils.py             # Training utilities (loops, schedulers, etc.)
+│       └── metrics.py                 # Evaluation, metrics computation, and reporting
+│
+├── main.py                            # Main entry point for running experiments
+│
+├── venv39/                            # Python virtual environment
+│
+├── .gitignore                         # Git ignore rules
+├── LICENSE                            # License file
+└── README.md                          # Project documentation
 
 ```
 

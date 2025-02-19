@@ -1,11 +1,10 @@
-
 import os
 import torch
 import hydra
 import random
 import numpy as np
+import importlib.util
 from omegaconf import DictConfig, OmegaConf
-
 
 
 def set_seeds(seed, deterministic=True):
@@ -24,7 +23,7 @@ def preprocessing(config, debug=False):
     print(f"Experiment Name: {config.exp.name}")
     set_seeds(config.exp.seed, deterministic=config.train.deterministic)
 
-    # Determine if the script is running locally or on a server
+    # Resolve project and dataset paths
     if os.path.exists(config.path.project_root_dir):
         config.exp.on_server = False    # Running locally
         config.path.dataset_root_dir = os.path.abspath(
@@ -37,50 +36,57 @@ def preprocessing(config, debug=False):
             os.path.join(config.path.project_root_dir, config.path.dataset_root_dir.server)
         )
 
-    # Generate a unique experiment name for saving models and logs
-    if config.model.identifier == "yolo":
-        config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
-    else:
-        config.exp.save_name = f"rs{config.exp.seed}_{config.model.identifier}{config.model.code}_{config.exp.name}_b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
+    # Generate experiment save name
+    config.exp.save_name = (
+        f"rs{config.exp.seed}_{config.model.identifier}_{config.exp.name}_"
+        f"b{config.train.batch_size}_e{config.train.epoch}_lr{config.train.lr}"
+    )
 
-    # Print the final processed configuration if debug mode is enabled
-    if debug: print(OmegaConf.to_yaml(config))
+    if debug:
+        print(OmegaConf.to_yaml(config))
 
     return config
 
+
+def dynamic_import(module_path, module_name):
+    """Dynamically import a module given its path."""
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None:
+        raise ImportError(f"Cannot find module {module_name} at {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="default_config")
 def main(config: DictConfig):
     """Main script entry point."""
+    cfg = preprocessing(config, debug=True)
 
-    # Preprocess config settings before running the main pipeline
-    config = preprocessing(config, debug=True)
-
-    return
 
     # Load dataset
     from datasets.dataset_loader import get_dataloader
-    train_loader, val_loader = get_dataloader(cfg.dataset)
+    train_loader, val_loader = get_dataloader(cfg.data)
 
-    # Dynamically load the correct model script
-    model_script = os.path.join("models", f"{cfg.model.model_name}.py")
-    if not os.path.exists(model_script):
-        raise ValueError(f"Model script {model_script} not found.")
+    # Dynamically load the model script
+    model_script_path = os.path.join("src", "models", f"{cfg.model.identifier}.py")
+    if not os.path.exists(model_script_path):
+        raise FileNotFoundError(f"Model script {model_script_path} not found.")
 
-    # Import the model script dynamically
-    model_module = __import__(f"models.{cfg.model.model_name}", fromlist=["build_model", "train_model", "evaluate_model"])
-    
+    # Import model module dynamically
+    model_module = dynamic_import(model_script_path, cfg.model.identifier)
+
+    # Build the model
     model = model_module.build_model(cfg)
-    model.to(cfg.device)
+    model.to(cfg.exp.device)
 
     # Train or evaluate
-    if cfg.task == "train":
+    if cfg.exp.mode == "train":
         model_module.train_model(model, train_loader, cfg)
-    elif cfg.task == "evaluate":
+    elif cfg.exp.mode == "evaluate":
         model_module.evaluate_model(model, val_loader, cfg)
     else:
-        print("Invalid task. Choose 'train' or 'evaluate'.")
+        raise ValueError("Invalid task. Choose 'train' or 'evaluate'.")
 
 if __name__ == "__main__":
     main()
