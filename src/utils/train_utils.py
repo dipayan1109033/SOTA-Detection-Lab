@@ -10,8 +10,8 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from utils.prepare_utils import *
-from src.utils.metrics import Evaluation_withCOCO, writeTo_csv_for_crossval
+from utils.setup_utils import *
+from utils.metrics_utils import Evaluation_withCOCO, writeTo_csv_for_crossval
 
 
 def set_seeds(seed):

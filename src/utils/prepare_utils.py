@@ -1,435 +1,317 @@
 
 import os
+import cv2
 import json
 import yaml
 import shutil
-import torch
-from sklearn.model_selection import KFold, ShuffleSplit
 
-from src.utils.common import Helper
+from utils.common_utils import Helper
 helper = Helper()
 
 
+# Create custom aanotation json file for missing VoTT json (without visual objects)
+def create_empty_custom_json(image_path, output_dir, image_id):
+    output_images_folder, output_labels_folder = helper.get_subfolder_paths(output_dir)
+    image = cv2.imread(image_path)
+    custom_json = {
+        "asset": {
+            "name": os.path.basename(image_path),
+            "image_id": image_id,
+            "size": {
+                "width": image.shape[1],
+                "height": image.shape[0]
+            },
+        },
+            "objects": []
+    }
+    # Write to a new JSON file
+    output_jsonfile_path = os.path.join(output_labels_folder, custom_json["asset"]["name"][:-4] + ".json")
+    helper.write_to_json(custom_json, output_jsonfile_path)
 
-# Collate image-target pairs into a tuple.
-def collate_fn(batch):
-    return tuple(zip(*batch))
+    # Also copy the image
+    shutil.copy(image_path, output_images_folder)
 
+# Create custom aanotation json file for missing VoTT json (without visual objects)
+def vott_to_json(json_file_path, image_folder, output_dir, image_id):
+    output_images_folder, output_labels_folder = helper.get_subfolder_paths(output_dir)
+      
+    # Load the JSON data from the file
+    data = helper.read_from_json(json_file_path)
+    image_path = os.path.join(image_folder, data["asset"]["name"])
 
-class DatasetInfo:
-    def __init__(self, dataset_path):
-        """
-        Initialize the DatasetInfo class by reading the dataset information from a JSON file.
-
-        Args:
-        - dataset_path: Dataset folder path
-        """
-        self.dataset_path = dataset_path
-        self.json_filepath = os.path.join(dataset_path, "dataset_info.json")
-
-        self.label_dict = {}
-        self.reverse_label_dict = {}
-        self.imagename_to_id = {}
-        self.id_to_imagename = {}
-
-        # Load dataset info from JSON file and store in class variables
-        self._load_dataset_info()
-
-    def _load_dataset_info(self):
-        """
-        Load the dataset info from a JSON file and populate class variables.
-        """
-        # Check if the dataset info file exists
-        if not os.path.exists(self.json_filepath):
-            raise FileNotFoundError(f"Dataset info file not found at: {self.json_filepath}")
-
-        # Read the dataset info JSON file
-        with open(self.json_filepath, 'r') as f:
-            data = json.load(f)
-
-        # Read the label dictionary and image name-to-id mappings
-        self.label_dict = data['categories']
-        self.label_dict_yolo = {name: id-1 for name, id in data['categories'].items()}
-        self.imagename_to_id = data['image_id_map']
-
-        # Reverse mappings for labels and image IDs
-        self.reverse_label_dict = {id: name for name, id in data['categories'].items()}
-        self.reverse_label_dict_yolo = {id-1: name for name, id in data['categories'].items()}
-        self.id_to_imagename = {id: name for name, id in data['image_id_map'].items()}
-
-    def get_label_dict(self):
-        """Return the label dictionary (categories)."""
-        return self.label_dict
-
-    def get_label_dict_yolo(self):
-        """Return the label dictionary (categories) for yolo."""
-        return self.label_dict_yolo
+    # Extracting key-value pairs
+    asset_info = {
+        "name": data["asset"]["name"],
+        "image_id": image_id,
+        "size": data["asset"]["size"],
+    }
     
-    def get_reverse_label_dict(self):
-        """Return the reverse label dictionary (id to label)."""
-        return self.reverse_label_dict
+    regions_info = []
+    if len(data['regions']) == 0: print(f"-------------- No bbox for: {data['asset']['name']} --------------")
+    for region in data["regions"]:      
+        if (region["boundingBox"]["width"] <0.05 or region["boundingBox"]["height"] <0.05):
+            print(f"Very small boxes found in {data['asset']['name']}")
+            continue
+        if len(region['tags']) > 1:
+            print(f".............. Multiple classes ({len(region['tags'])}) found for a bbox in: {data['asset']['name']} ({os.path.basename(json_file_path)}) ..............")
+        
+        aBoundingBox = {
+            "left": round(region["boundingBox"]["left"], 4),
+            "top": round(region["boundingBox"]["top"], 4),
+            "width": round(region["boundingBox"]["width"], 4),
+            "height": round(region["boundingBox"]["height"], 4),
+            "xmin": round(region["boundingBox"]["left"], 4),
+            "ymin": round(region["boundingBox"]["top"], 4),
+            "xmax": round(region["boundingBox"]["left"] + region["boundingBox"]["width"], 4),
+            "ymax": round(region["boundingBox"]["top"] + region["boundingBox"]["height"], 4)
+        }
 
-    def get_reverse_label_dict_yolo(self):
-        """Return the reverse label dictionary (id to label) for yolo."""
-        return self.reverse_label_dict_yolo
-    
-    def get_imagename_to_id(self):
-        """Return the image name to id mapping."""
-        return self.imagename_to_id
+        region_info = {
+            "class": region["tags"][0],
+            "boundingBox": aBoundingBox
+        }
+        regions_info.append(region_info)
 
-    def get_id_to_imagename(self):
-        """Return the image id to name mapping."""
-        return self.id_to_imagename
+    # Create a new dictionary to hold the extracted values
+    custom_json = {
+        "asset": asset_info,
+        "objects": regions_info
+    }
+
+    # Write the extracted data to a new JSON file
+    output_jsonfile_path = os.path.join(output_labels_folder, custom_json["asset"]["name"][:-4] + ".json")
+    helper.write_to_json(custom_json, output_jsonfile_path)
+
+    # Also copy the image
+    shutil.copy(image_path, output_images_folder)
+
+# Convert VoTT generated json label to custom json formatted label
+def convert_VOTT_to_custom_JsonFormat(image_folder, annotation_folder, output_dir, start_image_id=1):
+    output_images_folder, output_labels_folder = helper.create_subfolders(output_dir)
+
+    # Convert with json annotation file
+    json_files = helper.get_files_with_extension(annotation_folder, extension=".json")
+    for ajson_file in json_files:
+        input_json_file = os.path.join(annotation_folder, ajson_file)
+        vott_to_json(input_json_file, image_folder, output_dir, image_id=start_image_id)
+        start_image_id += 1
+
+    # Image files without any annotated VoTT json file
+    image_files_all = helper.get_files_with_extensions(image_folder, extensions= [".jpg", ".png"])
+    image_files_with_json = helper.get_files_with_extensions(output_images_folder, extensions= [".jpg", ".png"])
+    image_files_without_json = list(set(image_files_all) - set(image_files_with_json))
+
+    # Convert without json annotation file 
+    for image_file in image_files_without_json:
+        src_image_path = os.path.join(image_folder, image_file)
+        create_empty_custom_json(src_image_path, output_dir, image_id=start_image_id)
+        start_image_id += 1
+
+    # Display some log message
+    if len(image_files_without_json) > 0:
+        print(f"\nMissing VoTT file(s): {len(image_files_without_json)}")
+
+    print("Conversion complete.")
+    return start_image_id
 
 
 
 
-def convert_to_yolo(json_filepath, output_path):
+def draw_on_aimage(image_path, json_label_path):
     """
-    Converts a JSON file with bounding box annotations to YOLO format.
+    Plots bounding boxes over an image from provided custom json label json file.
 
     Args:
-        dataInfo: An object of DatasetInfo class
-        json_filepath: Path to the JSON file containing annotations.
-        output_path: Folder path to save the YOLO formatted output.
-        singleClass: Flag indicating whether to use a single class for all objects.
+        image_path: Path to the image file.
+        json_label_path: Path to the corresponding custom json label file.
     """
-
-    json_filename = os.path.basename(json_filepath)
-    yolo_txt_filepath = os.path.join(output_path, json_filename[:-4] + "txt")
+    # Read the image
+    image = cv2.imread(image_path)
 
     # Load JSON data
-    with open(json_filepath, 'r') as file:
-        data = json.load(file)
+    with open(json_label_path, 'r') as file:
+        json_data = json.load(file)
 
-    # Extract image dimensions
-    image_width = data['asset']['size']['width']
-    image_height = data['asset']['size']['height']
+    # Loop through each object in the JSON
+    for object_data in json_data["objects"]:
+        # Extract bounding box information
+        xmin = int(object_data["boundingBox"]["xmin"])
+        ymin = int(object_data["boundingBox"]["ymin"])
+        xmax = int(object_data["boundingBox"]["xmax"])
+        ymax = int(object_data["boundingBox"]["ymax"])
 
-    # Write YOLO format data to the output file
-    with open(yolo_txt_filepath, 'w') as txt_file:
-        for obj in data['objects']:
+        # Draw the bounding box on the image
+        cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)  # Green for boxes
 
-            class_label_id = obj['class'] - 1      # Yolo class_label_id start from 0 (zero)
-            bbox = obj['boundingBox']
+        # Optional: Add class label text (modify as needed)
+        confidence_score = f" ({object_data['score']:.2f})" if "score" in object_data else ""
+        class_label =  f"{object_data['class']}{confidence_score}"
 
-            # Calculate normalized center coordinates
-            x_center = (bbox['xmin'] + bbox['width'] / 2) / image_width
-            y_center = (bbox['ymin'] + bbox['height'] / 2) / image_height
+        buttom = ymin + 25 if ymin < 30 else ymin - 8
+        cv2.putText(image, class_label, (xmin+5, buttom), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)  # Green text
 
-            # Calculate normalized width and height
-            width = bbox['width'] / image_width
-            height = bbox['height'] / image_height
+    return image
 
-            # Write object information in YOLO format
-            txt_file.write(f"{class_label_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+# Draw bounding boxes over all images of a custom dataset
+def draw_bboxes_over_images(dataset_path):
+    output_folder_path = os.path.join(dataset_path, "images_withBBoxes")
+    os.makedirs(output_folder_path, exist_ok=True)
 
-def convert_custom_labels_yolo_labels(custom_labels_path, yolo_labels_path):
-    json_filelist = helper.get_files_with_extension(custom_labels_path, extension=".json")
-    for filename in json_filelist:
-        json_filepath = os.path.join(custom_labels_path, filename)
-        convert_to_yolo(json_filepath, yolo_labels_path)
+    imagefolder_path, labelfolder_path = helper.get_subfolder_paths(dataset_path)
+    image_list = helper.get_image_files(imagefolder_path)
 
-def update_yaml_file(src_dataset_dir, temp_dataset_dir, fold_name=None, test_split=False):
-    dataset_folder = helper.get_immediate_folder_name(src_dataset_dir)
-    dataset_yaml = os.path.join(src_dataset_dir, "dataset.yaml")
+    for filename in image_list:
+        image_path = os.path.join(imagefolder_path, filename) 
+        label_path = os.path.join(labelfolder_path, filename[:-4] + ".json") 
+        imageWithBB = draw_on_aimage(image_path, label_path)
+        save_path = os.path.join(output_folder_path, filename)
+        cv2.imwrite(save_path, imageWithBB)
 
-    # Read the YAML file
-    with open(dataset_yaml, 'r') as file:
-        data = yaml.safe_load(file)
+# Check and copy images without any bbox
+def check_images_withoutBBox(dataset_path, debug=False):
+    output_folder_path = os.path.join(dataset_path, "images_withoutBBoxes")
+    os.makedirs(output_folder_path, exist_ok=True)
 
-    if not fold_name:
-        dataset_dir = temp_dataset_dir
-        yaml_filepath = os.path.join(temp_dataset_dir, f"{dataset_folder}.yaml")
-        if test_split: data['test'] = "test/images"
+    imagefolder_path, labelfolder_path = helper.get_subfolder_paths(dataset_path)
+    label_filelist = helper.get_files_with_extension(labelfolder_path, extension=".json")
+
+    images_withoutBbox = []
+    for json_file in label_filelist:
+        json_filepath = os.path.join(labelfolder_path, json_file)
+
+        # Load the JSON data from the file
+        data = helper.read_from_json(json_filepath)
+        if len(data['objects']) == 0: 
+            images_withoutBbox.append(data['asset']['name'])
+            image_path = os.path.join(imagefolder_path, data['asset']['name'])
+            shutil.copy(image_path, output_folder_path)
+
+    
+    if len(images_withoutBbox) > 0:
+        print(f"Images without bbox: {len(images_withoutBbox)}")
+        if debug:
+            for image_file in images_withoutBbox:
+                print(image_file)
+
+# Check the boundary co-ordinates for each of the bouding box
+def check_bbox_coordinates(dataset_path, fixFlag=False):
+    labelfolder_path = os.path.join(dataset_path, "labels")
+    label_filelist = helper.get_files_with_extension(labelfolder_path, extension=".json")
+
+    count = 0
+    for json_file in label_filelist:
+        json_filepath = os.path.join(labelfolder_path, json_file)
+        data = helper.read_from_json(json_filepath)
+
+        image_width = data['asset']['size']['width']
+        image_height = data['asset']['size']['height']
+
+        for object in data["objects"]:
+            bbox = object['boundingBox']
+            xmin, ymin, xmax, ymax = bbox['xmin'], bbox['ymin'], bbox['xmax'], bbox['ymax']
+
+            if xmin < 0.0 or ymin < 0.0 or xmax > image_width or ymax > image_height:
+                print(f"Image width: {image_width:6.2f}: {xmin:6.2f} > {xmax:6.2f} image_height: {image_height:6.2f}: {ymin:6.2f} > {ymax:6.2f}")
+                count += 1
+
+            if fixFlag:
+                if xmin < 0.0:
+                    bbox['xmin'] = 0.0
+                if ymin < 0.0:
+                    bbox['ymin'] = 0.0
+                if xmax > (image_width-1.0):
+                    bbox['xmax'] = image_width
+                    bbox['width'] = bbox['xmax'] - bbox['xmin']
+                if ymax > (image_height-1.0):
+                    bbox['ymax'] = image_height
+                    bbox['height'] = bbox['ymax'] - bbox['ymin']
+
+                helper.write_to_json(data, json_filepath)
+    print(f"Total bbox issue count: {count}")
+
+# Check for all unique class labels present in the dataset
+def check_objects_classes(dataset_path):
+    labelfolder_path = os.path.join(dataset_path, "labels")
+    label_filelist = helper.get_files_with_extension(labelfolder_path, extension=".json")
+
+    classes = set()
+    for json_file in label_filelist:
+        json_filepath = os.path.join(labelfolder_path, json_file)
+
+        data = helper.read_from_json(json_filepath)
+        for object in data["objects"]:
+            classes.add(object["class"])
+
+    print(f"Classes: {classes}")
+    return classes
+
+def update_objects_classes(dataset_path, class_mappping= None):
+    labelfolder_path = os.path.join(dataset_path, "labels")
+    label_filelist = helper.get_files_with_extension(labelfolder_path, extension=".json")
+
+    if not class_mappping:
+        raise ValueError(f"'class_mappping' is required to update class labels.")
+
+    for json_file in label_filelist:
+        json_filepath = os.path.join(labelfolder_path, json_file)
+
+        data = helper.read_from_json(json_filepath)
+        for object in data["objects"]:
+            object["class"] = class_mappping[object["class"]]
+
+        helper.write_to_json(data, json_filepath)
+
+
+
+# Construct dataset info json file for the processed dataset
+def construct_and_save_dataset_info(dataset_path, singleClass=True, label_dict=None):
+    if not singleClass and not label_dict:
+        raise ValueError(f"The 'label_dict' can't be None for multiple classes.")
+    labelfolder_path = os.path.join(dataset_path, "labels") 
+
+    image_name_to_id = {}
+    json_files = helper.get_files_with_extension(labelfolder_path, extension=".json")
+    for json_file in json_files:
+        json_path = os.path.join(labelfolder_path, json_file)
+        json_data = helper.read_from_json(json_path)
+
+        image_name = json_data["asset"]["name"]
+        image_id = json_data["asset"]["image_id"]
+        image_name_to_id[image_name] = image_id
+
+    if singleClass:
+        dataset_info = {"categories" : {"object": 1}, "image_id_map": image_name_to_id}
     else:
-        dataset_dir = os.path.join(temp_dataset_dir, fold_name)
-        yaml_filepath = os.path.join(temp_dataset_dir, f"{fold_name}_{dataset_folder}.yaml")
+        dataset_info = {"categories" : label_dict, "image_id_map": image_name_to_id}
+    
+    save_filepath = os.path.join(dataset_path, "dataset_info.json")
+    helper.write_to_json(dataset_info, save_filepath)
 
-    # Update the root dataset absolute directory
-    data['path'] = dataset_dir
+# Construct yaml file of processed dataset for yolo model 
+def write_yaml_file(dataset_path, singleClass=True, label_dict=None):
+    if singleClass:
+        reverse_label_dict = {0: 'object'}
+    else:
+        reverse_label_dict = {(v-1): k for k, v in label_dict.items()}
+
+    # Define the content as a Python dictionary
+    data = {
+        'path': dataset_path,
+        'train': 'train/images',
+        'val': 'val/images',
+        'test': None,  # Optional field, set to None if not present
+
+        # Classes
+        'names': reverse_label_dict
+    }
 
     # Write data to the YAML file
-    with open(yaml_filepath, 'w') as file:
+    save_filepath = os.path.join(dataset_path, "dataset.yaml")
+    with open(save_filepath, 'w') as file:
         yaml.dump(data, file)
 
 
-
-
-def partition_dataset_by_ratio(src_dataset_dir, temp_dataset_dir, split_ratios=[0.8, 0.2, 0.0], seed=42):
-    """
-    Splits the dataset into train, val, and test based on given split ratios.
-
-    Args:
-        src_dataset_dir (str): Path to the source dataset directory.
-        temp_dataset_dir (str): Path to the temporary directory where split datasets will be stored.
-        split_ratios (list): List of three floats representing the train, val, test split ratios. Should sum to 1.0.
-    """
-    if os.path.exists(temp_dataset_dir):
-        return
-    else:
-        os.makedirs(temp_dataset_dir, exist_ok=True)
-
-    # Get paths to images and labels subdirectories
-    src_images_folder, src_labels_folder = helper.get_subfolder_paths(src_dataset_dir)
-
-    # Get list of images and labels
-    images_list = sorted(helper.get_image_files(src_images_folder))
-    labels_list = sorted(helper.get_files_with_extension(src_labels_folder, extension=".json"))
-
-    # Ensure that image and label files match
-    assert len(split_ratios) == 3, "Split ratio must be a list of three elements: [train_ratio, val_ratio, test_ratio]."
-    assert sum(split_ratios) == 1.0, "Split ratios must sum to 1.0."
-    assert all([os.path.splitext(img)[0] == os.path.splitext(lbl)[0] for img, lbl in zip(images_list, labels_list)]), "Image and label filenames don't match"
-
-    # Split into train, val, and test
-    total = len(images_list)
-    val_len = int(split_ratios[1] * total)
-    test_len = int(split_ratios[2] * total)
-    train_len = total - val_len - test_len  # Remaining for train set
-
-    # Set the random seed for reproducibility
-    generator = torch.Generator().manual_seed(seed)
-    train_images, val_images, test_images = torch.utils.data.random_split(images_list, [train_len, val_len, test_len], generator=generator)
-    generator = torch.Generator().manual_seed(seed)
-    train_labels, val_labels, test_labels = torch.utils.data.random_split(labels_list, [train_len, val_len, test_len], generator=generator)
-
-    # Create subdirectories for train, val, and test
-    temp_train_dir, temp_val_dir, temp_test_dir = helper.create_subfolders(temp_dataset_dir, folder_list=['train', 'val', 'test'])
-    tt_images_folder, tt_labels_folder, tt_clabels_folder = helper.create_subfolders(temp_train_dir, folder_list=['images', 'labels', 'custom_labels'])
-    tv_images_folder, tv_labels_folder, tv_clabels_folder = helper.create_subfolders(temp_val_dir, folder_list=['images', 'labels', 'custom_labels'])
-    ts_images_folder, ts_labels_folder, ts_clabels_folder = helper.create_subfolders(temp_test_dir, folder_list=['images', 'labels', 'custom_labels'])
-
-    # Transfer training images and labels
-    helper.copy_specified_files(src_images_folder, tt_images_folder, file_list=train_images)
-    helper.copy_specified_files(src_labels_folder, tt_clabels_folder, file_list=train_labels)
-    convert_custom_labels_yolo_labels(tt_clabels_folder, tt_labels_folder)
-
-    # Transfer validation images and labels
-    helper.copy_specified_files(src_images_folder, tv_images_folder, file_list=val_images)
-    helper.copy_specified_files(src_labels_folder, tv_clabels_folder, file_list=val_labels)
-    convert_custom_labels_yolo_labels(tv_clabels_folder, tv_labels_folder)
-
-    # Transfer test images and labels
-    helper.copy_specified_files(src_images_folder, ts_images_folder, file_list=test_images)
-    helper.copy_specified_files(src_labels_folder, ts_clabels_folder, file_list=test_labels)
-    convert_custom_labels_yolo_labels(ts_clabels_folder, ts_labels_folder)
-
-    # Update and save the YAML config file
-    update_yaml_file(src_dataset_dir, temp_dataset_dir, test_split=test_len>0)
-
-    shutil.copy(os.path.join(src_dataset_dir, "dataset_info.json"), temp_dataset_dir)
-    print("Dataset setup completed via splits by ratio.")
-
-def partition_dataset_custom(src_dataset_dir, temp_dataset_dir, custom_splits_dir, split_code):
-    if os.path.exists(temp_dataset_dir):
-        return
-    else:
-        os.makedirs(temp_dataset_dir, exist_ok=True)
-
-    # Get paths to images and labels subdirectories
-    src_images_folder, src_labels_folder = helper.get_subfolder_paths(src_dataset_dir)
-
-    # Read and extract dataset custom splits information
-    dataset_folder = helper.get_immediate_folder_name(src_dataset_dir)
-    custom_splits_filepath = os.path.join(custom_splits_dir, f"{dataset_folder}_{split_code}.json")
-    metadata = helper.read_from_json(custom_splits_filepath)
-    train_images = metadata['train_images']
-    val_images = metadata['val_images']
-    test_images = metadata['test_images']
-    train_labels = [imagefile[:-4] + ".json" for imagefile in metadata['train_images']]
-    val_labels = [imagefile[:-4] + ".json" for imagefile in metadata['val_images']]
-    test_labels = [imagefile[:-4] + ".json" for imagefile in metadata['test_images']]
-
-
-    # Create subdirectories for train, val, and test
-    temp_train_dir, temp_val_dir, temp_test_dir = helper.create_subfolders(temp_dataset_dir, folder_list=['train', 'val', 'test'])
-    tt_images_folder, tt_labels_folder, tt_clabels_folder = helper.create_subfolders(temp_train_dir, folder_list=['images', 'labels', 'custom_labels'])
-    tv_images_folder, tv_labels_folder, tv_clabels_folder = helper.create_subfolders(temp_val_dir, folder_list=['images', 'labels', 'custom_labels'])
-    ts_images_folder, ts_labels_folder, ts_clabels_folder = helper.create_subfolders(temp_test_dir, folder_list=['images', 'labels', 'custom_labels'])
-
-    # Transfer training images and labels
-    helper.copy_specified_files(src_images_folder, tt_images_folder, file_list=train_images)
-    helper.copy_specified_files(src_labels_folder, tt_clabels_folder, file_list=train_labels)
-    convert_custom_labels_yolo_labels(tt_clabels_folder, tt_labels_folder)
-
-    # Transfer validation images and labels
-    helper.copy_specified_files(src_images_folder, tv_images_folder, file_list=val_images)
-    helper.copy_specified_files(src_labels_folder, tv_clabels_folder, file_list=val_labels)
-    convert_custom_labels_yolo_labels(tv_clabels_folder, tv_labels_folder)
-
-    # Transfer test images and labels
-    helper.copy_specified_files(src_images_folder, ts_images_folder, file_list=test_images)
-    helper.copy_specified_files(src_labels_folder, ts_clabels_folder, file_list=test_labels)
-    convert_custom_labels_yolo_labels(ts_clabels_folder, ts_labels_folder)
-
-    # Update and save the YAML config file
-    update_yaml_file(src_dataset_dir, temp_dataset_dir, test_split=len(test_images)>0)
-
-    shutil.copy(os.path.join(src_dataset_dir, "dataset_info.json"), temp_dataset_dir)
-    print("Dataset setup completed via custom splits.")
-
-def cv_partition_custom(src_dataset_dir, temp_dataset_dir, num_folds, custom_splits_dir, split_code):
-    if os.path.exists(temp_dataset_dir):
-        return
-    else:
-        os.makedirs(temp_dataset_dir, exist_ok=True)
-
-    # Get paths to images and labels subdirectories
-    src_images_folder, src_labels_folder = helper.get_subfolder_paths(src_dataset_dir)
-
-    # Read and extract dataset custom splits information
-    dataset_folder = helper.get_immediate_folder_name(src_dataset_dir)
-    custom_splits_filepath = os.path.join(custom_splits_dir, f"{dataset_folder}_cv{num_folds}_{split_code}.json")
-    metadata = helper.read_from_json(custom_splits_filepath)
-    print(custom_splits_filepath)
-    print(metadata.keys())
-
-    kfold = metadata["num_folds"]
-    assert kfold == num_folds, "Number of folds doesn't match"
-
-    # Iterate over each fold
-    for fold_idx in range(num_folds):
-        temp_dataset_fold_dir = os.path.join(temp_dataset_dir, f"fold{fold_idx}")
-        temp_train_dir, temp_val_dir = helper.create_subfolders(temp_dataset_fold_dir, folder_list=['train', 'val'])
-        tt_images_folder, tt_labels_folder, tt_clabels_folder = helper.create_subfolders(temp_train_dir, folder_list=['images', 'labels', 'custom_labels'])
-        tv_images_folder, tv_labels_folder, tv_clabels_folder = helper.create_subfolders(temp_val_dir, folder_list=['images', 'labels', 'custom_labels'])
-
-        # Copy the images and labels for the current fold's training set
-        train_images = metadata[f'train_images_fold{fold_idx}']
-        train_labels = [imagefile[:-4] + ".json" for imagefile in train_images]
-        helper.copy_specified_files(src_images_folder, tt_images_folder, file_list=train_images)
-        helper.copy_specified_files(src_labels_folder, tt_clabels_folder, file_list=train_labels)
-        convert_custom_labels_yolo_labels(tt_clabels_folder, tt_labels_folder)
-
-        # Copy the images and labels for the current fold's val set
-        val_images = metadata[f'val_images_fold{fold_idx}']
-        val_labels = [imagefile[:-4] + ".json" for imagefile in val_images]
-        helper.copy_specified_files(src_images_folder, tv_images_folder, file_list=val_images)
-        helper.copy_specified_files(src_labels_folder, tv_clabels_folder, file_list=val_labels)
-        convert_custom_labels_yolo_labels(tv_clabels_folder, tv_labels_folder)
-
-        # Update and save the YAML config file
-        update_yaml_file(src_dataset_dir, temp_dataset_dir, fold_name=f"fold{fold_idx}")
-
-    shutil.copy(os.path.join(src_dataset_dir, "dataset_info.json"), temp_dataset_dir)
-    print("Dataset setup completed for cross validation (without replacement).")
-
-
-def cv_partition_without_replacement(src_dataset_dir, temp_dataset_dir, num_folds=3, seed=42):
-    if os.path.exists(temp_dataset_dir):
-        return
-    else:
-        os.makedirs(temp_dataset_dir, exist_ok=True)
-
-    # Get paths to images and labels subdirectories
-    src_images_folder, src_labels_folder = helper.get_subfolder_paths(src_dataset_dir)
-
-    # Get list of images and labels
-    images_list = sorted(helper.get_image_files(src_images_folder))
-    labels_list = sorted(helper.get_files_with_extension(src_labels_folder, extension=".json"))
-
-    # Ensure that image and label files match
-    assert all([os.path.splitext(img)[0] == os.path.splitext(lbl)[0] for img, lbl in zip(images_list, labels_list)]), "Image and label filenames don't match"
-
-
-    # Create K-fold cross-validation splits
-    kf = KFold(n_splits=num_folds, shuffle=True, random_state=seed)
-
-    # Iterate over each fold
-    for fold_idx, (train_idx, val_idx) in enumerate(kf.split(images_list)):
-        temp_dataset_fold_dir = os.path.join(temp_dataset_dir, f"fold{fold_idx}")
-        temp_train_dir, temp_val_dir = helper.create_subfolders(temp_dataset_fold_dir, folder_list=['train', 'val'])
-        tt_images_folder, tt_labels_folder, tt_clabels_folder = helper.create_subfolders(temp_train_dir, folder_list=['images', 'labels', 'custom_labels'])
-        tv_images_folder, tv_labels_folder, tv_clabels_folder = helper.create_subfolders(temp_val_dir, folder_list=['images', 'labels', 'custom_labels'])
-
-        # Copy the images and labels for the current fold's training set
-        train_images = [images_list[i] for i in train_idx]
-        train_labels = [labels_list[i] for i in train_idx]
-        helper.copy_specified_files(src_images_folder, tt_images_folder, file_list=train_images)
-        helper.copy_specified_files(src_labels_folder, tt_clabels_folder, file_list=train_labels)
-        convert_custom_labels_yolo_labels(tt_clabels_folder, tt_labels_folder)
-
-        # Copy the images and labels for the current fold's val set
-        val_images = [images_list[i] for i in val_idx]
-        val_labels = [labels_list[i] for i in val_idx]
-        helper.copy_specified_files(src_images_folder, tv_images_folder, file_list=val_images)
-        helper.copy_specified_files(src_labels_folder, tv_clabels_folder, file_list=val_labels)
-        convert_custom_labels_yolo_labels(tv_clabels_folder, tv_labels_folder)
-
-        # Update and save the YAML config file
-        update_yaml_file(src_dataset_dir, temp_dataset_dir, fold_name=f"fold{fold_idx}")
-
-    shutil.copy(os.path.join(src_dataset_dir, "dataset_info.json"), temp_dataset_dir)
-    print("Dataset setup completed for cross validation (without replacement).")
-
-def cv_partition_with_replacement(src_dataset_dir, temp_dataset_dir, split_ratios=[0.8, 0.2, 0.0], num_folds=3, seed=42):
-    if os.path.exists(temp_dataset_dir):
-        return
-    else:
-        os.makedirs(temp_dataset_dir, exist_ok=True)
-
-    # Get paths to images and labels subdirectories
-    src_images_folder, src_labels_folder = helper.get_subfolder_paths(src_dataset_dir)
-
-    # Get list of images and labels
-    images_list = sorted(helper.get_image_files(src_images_folder))
-    labels_list = sorted(helper.get_files_with_extension(src_labels_folder, extension=".json"))
-
-    # Ensure that image and label files match
-    assert len(split_ratios) == 3, "Split ratio must be a list of three elements: [train_ratio, val_ratio, test_ratio]."
-    assert sum(split_ratios[:2]) == 1.0, "Split ratios [train_ratio, val_ratio] must sum to 1.0."
-    assert all([os.path.splitext(img)[0] == os.path.splitext(lbl)[0] for img, lbl in zip(images_list, labels_list)]), "Image and label filenames don't match"
-
-
-    # ShuffleSplit for cross-validation with replacement
-    train_ratio, val_ratio, _ = split_ratios
-    shuffle_split = ShuffleSplit(n_splits=num_folds, train_size=train_ratio, test_size=val_ratio, random_state=seed)
-
-    # Create each fold
-    for fold_idx, (train_idx, val_idx) in enumerate(shuffle_split.split(images_list)):
-        temp_dataset_fold_dir = os.path.join(temp_dataset_dir, f"fold{fold_idx}")
-        temp_train_dir, temp_val_dir = helper.create_subfolders(temp_dataset_fold_dir, folder_list=['train', 'val'])
-        tt_images_folder, tt_labels_folder, tt_clabels_folder = helper.create_subfolders(temp_train_dir, folder_list=['images', 'labels', 'custom_labels'])
-        tv_images_folder, tv_labels_folder, tv_clabels_folder = helper.create_subfolders(temp_val_dir, folder_list=['images', 'labels', 'custom_labels'])
-
-        # Copy the training set for this fold
-        train_images = [images_list[i] for i in train_idx]
-        train_labels = [labels_list[i] for i in train_idx]
-        helper.copy_specified_files(src_images_folder, tt_images_folder, file_list=train_images)
-        helper.copy_specified_files(src_labels_folder, tt_clabels_folder, file_list=train_labels)
-        convert_custom_labels_yolo_labels(tt_clabels_folder, tt_labels_folder)
-
-        # Copy the validation set for this fold
-        val_images = [images_list[i] for i in val_idx]
-        val_labels = [labels_list[i] for i in val_idx]
-        helper.copy_specified_files(src_images_folder, tv_images_folder, file_list=val_images)
-        helper.copy_specified_files(src_labels_folder, tv_clabels_folder, file_list=val_labels)
-        convert_custom_labels_yolo_labels(tv_clabels_folder, tv_labels_folder)
-
-        # Update and save the YAML config file
-        update_yaml_file(src_dataset_dir, temp_dataset_dir, fold_name=f"fold{fold_idx}")
-
-    shutil.copy(os.path.join(src_dataset_dir, "dataset_info.json"), temp_dataset_dir)
-    print("Dataset setup completed for cross validation (with replacement).")
-
-
-
-def get_temp_dataset_path(cfg, dataset_folder, mode="train", num_folds=3, use_replacement=False, split_ratios=[0.8, 0.2, 0.0], split_code=None, seed=42):
-    # Define the temporary directory for datasets
-    temp_dataset_root_dir = os.path.join(cfg.path.project_root_dir, cfg.path.input_dir, "temp_datasets")
-
-    # Choose data partitions
-    if mode == "crossval":      # For cross-val experiement
-        if use_replacement:             # with replacement
-            train_split, val_split, test_split = [int(split * 100) for split in split_ratios]
-            temp_dataset_path = os.path.join(temp_dataset_root_dir, f"{dataset_folder}_{train_split}_{val_split}_cv{num_folds}")
-        else:                           # without replacement
-            temp_dataset_path = os.path.join(temp_dataset_root_dir, f"{dataset_folder}_cv{num_folds}")
-    elif split_code:            # Partition with provided custom splits file
-        temp_dataset_path = os.path.join(temp_dataset_root_dir, f"{dataset_folder}_{split_code}")
-    else:                        # Partition with splits percentage ratios
-        train_split, val_split, test_split = [int(split * 100) for split in split_ratios]
-        temp_dataset_path = os.path.join(temp_dataset_root_dir, f"{dataset_folder}_{train_split}_{val_split}_{test_split}_seed{seed}")
-
-    return temp_dataset_path
+def create_dataset_info(dataset_root_dir, dataset_folder, singleClass=True, label_dict=None):
+    dataset_path = os.path.join(dataset_root_dir, dataset_folder)
+    construct_and_save_dataset_info(dataset_path, singleClass=singleClass, label_dict=label_dict)
+    write_yaml_file(dataset_path, singleClass=singleClass, label_dict=label_dict) 

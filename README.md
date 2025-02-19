@@ -51,15 +51,15 @@ SOTA-DETECTION-LAB/
 │   │   ├── faster_rcnn.py             # Faster R-CNN model
 │   │   └── yolo.py                    # YOLO model
 │   │
-│   └── utils/                         # Utility scripts
-│       ├── common.py                  # General helper functions
-│       ├── data_utils.py              # Dataset-related utilities
-│       ├── dataset_utils.py           # Additional dataset processing helpers
-│       ├── inference.py               # Unified inference pipeline
-│       └── train_utils.py             # Training utilities (loops, schedulers, etc.)
-│       └── metrics.py                 # Evaluation, metrics computation, and reporting
-│
-├── main.py                            # Main entry point for running experiments
+│   ├── utils/                         # Utility scripts
+│   │   ├── common_utils.py            # General helper functions
+│   │   ├── prepare_utils.py           # Raw dataset preprocess related utilities
+│   │   ├── dataset_utils.py           # TorchVision Dataset, Dataloader-related utilities
+│   │   ├── setup_utils.py             # Experimental Dataset Setup related
+│   │   ├── train_utils.py             # Training utilities (loops, schedulers, etc.)
+│   │   └── metrics_utils.py           # Evaluation, metrics computation, and reporting
+│   │
+│   └── main.py                        # Main entry point for running experiments
 │
 ├── venv39/                            # Python virtual environment
 │

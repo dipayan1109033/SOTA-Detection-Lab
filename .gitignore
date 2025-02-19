@@ -46,6 +46,9 @@ models/weights/
 *.pt
 *.onnx
 
+# Metrics & evaluation results
+src/utils/calculate_ODmetrics/
+
 # Hydra config outputs
 hydra_outputs/
 

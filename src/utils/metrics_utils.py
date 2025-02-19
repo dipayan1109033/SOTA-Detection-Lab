@@ -17,7 +17,7 @@ from scripts.evaluators.coco_evaluator import get_coco_summary, get_coco_metrics
 from scripts.utils.enumerators import BBFormat, BBType, CoordinatesType
 
 
-from src.utils.common import Helper
+from utils.common_utils import Helper
 helper = Helper()
 
 
