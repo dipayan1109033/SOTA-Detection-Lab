@@ -3,7 +3,7 @@
 # Experiment Configuration
 # ----------------------------
 exp:
-  mode: predict                       # Running mode: ['train', 'evaluate', 'predict']
+  mode: train                       # Running mode: ['train', 'evaluate', 'predict']
   name: default                     # Experiment name for logging and model saving
 
 

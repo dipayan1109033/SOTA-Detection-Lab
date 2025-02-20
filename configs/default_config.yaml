@@ -33,10 +33,7 @@ exp:
 # ----------------------------
 path:
   project_root_dir: '/Volumes/Works/Projects/SOTA-Detection-Lab'  # Absolute path to the project directory - set dynamically for server
-  
-  dataset_root_dir:                         # Dataset location (relative to project_root_dir) - set dynamically
-    local: './data/processed'               # Local dataset folder inside the project directory
-    server: '../datasets/object_detection'  # Dataset location on the server (one directory above project)
+  dataset_root_dir: './data/processed'                            # Dataset location (relative to project_root_dir)
 
   input_dir: experiments/input              # Directory for input experiment files
   output_dir: experiments/output/${model.identifier}  # Directory for model-specific outputs

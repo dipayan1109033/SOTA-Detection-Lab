@@ -45,13 +45,13 @@ def preprocessing(config, debug=False):
     if os.path.exists(config.path.project_root_dir):
         config.exp.on_server = False    # Running locally
         config.path.dataset_root_dir = os.path.abspath(
-            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir.local)
+            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir)
         )
     else:
         config.exp.on_server = True    # Running on a server
         config.path.project_root_dir = hydra.utils.get_original_cwd()  # Hydra-safe project root
         config.path.dataset_root_dir = os.path.abspath(
-            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir.server)
+            os.path.join(config.path.project_root_dir, config.path.dataset_root_dir)
         )
 
     # Generate experiment save name

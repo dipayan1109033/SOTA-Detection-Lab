@@ -28,6 +28,7 @@ nohup.out
 
 # Data & datasets
 data/
+!data/processed/coco8/
 *.csv
 *.json
 *.xml
@@ -87,7 +88,4 @@ config.json
 credentials.json
 
 
-data/
-!data/processed/
-!data/processed/coco8/
-!data/processed/coco8/**
+
