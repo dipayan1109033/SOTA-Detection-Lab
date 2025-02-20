@@ -11,6 +11,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from utils.setup_utils import *
+from utils.dataset_utils import DatasetInfo
 from utils.metrics_utils import Evaluation_withCOCO, writeTo_csv_for_crossval
 
 

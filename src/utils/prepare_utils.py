@@ -5,8 +5,41 @@ import json
 import yaml
 import shutil
 
-from utils.common_utils import Helper
+from src.utils.common_utils import Helper
 helper = Helper()
+
+
+
+# Function to truncate float values without rounding
+def truncate_float(value, decimals=4):
+    """
+    Truncates a float to a specified number of decimal places without rounding.
+    
+    :param value: The float value to be truncated
+    :param decimals: Number of decimal places to keep
+    :return: Truncated float value
+    """
+    factor = 10.0 ** decimals
+    return int(value * factor) / factor
+
+# Function to generate unique image ID ensuring no duplicates
+def generate_unique_image_id(image_name, existing_ids):
+    """
+    Generates a unique, positive image ID using Python's built-in hash function.
+    Ensures no duplicate IDs by keeping track of generated values.
+
+    :param image_name: Name of the image file
+    :param existing_ids: Set containing already assigned image IDs to avoid duplicates
+    :return: Unique positive image ID
+    """
+    image_id = abs(hash(image_name)) % (10**9)  # 9-digit positive ID
+    
+    while image_id in existing_ids:
+        image_id = abs(hash(image_name + str(image_id))) % (10**9)
+    
+    existing_ids.add(image_id)
+    return image_id
+
 
 
 # Create custom aanotation json file for missing VoTT json (without visual objects)

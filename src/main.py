@@ -1,4 +1,6 @@
-import os
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import torch
 import hydra
 import random
@@ -6,8 +8,8 @@ import numpy as np
 import importlib.util
 from omegaconf import DictConfig, OmegaConf
 
-from utils.setup_utils import *
-from utils.common_utils import Helper
+from src.utils.setup_utils import *
+from src.utils.common_utils import Helper
 helper = Helper()
 
 
@@ -53,52 +55,6 @@ def preprocessing(config, debug=False):
     return config
 
 
-def setup_dataset(cfg):
-    """
-    Set up the dataset for training, validation, and testing based on the configuration.
-
-    Args:
-        cfg (OmegaConf): The configuration object containing dataset and path details.
-
-    Returns:
-        str: Path to the prepared dataset directory.
-    """
-    # Extract dataset folder name and root directory from configuration
-    dataset_folder = cfg.data.folder
-    src_datasets_root_dir = cfg.data.root_dir
-
-    # Define the source and temporary directory for datasets
-    src_dataset_path = os.path.join(src_datasets_root_dir, dataset_folder)
-    temp_datasets_root_dir = os.path.join(cfg.path.project_root_dir, cfg.path.input_dir, "temp_datasets")
-
-    # Choose data partitions
-
-    if cfg.exp.mode == "train" or (cfg.model.saved_model_folder and ("train" in cfg.model.saved_model_folder or "fold" in cfg.model.saved_model_folder)):
-        if cfg.data.split_code:             # Partition with provided custom splits file
-            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{cfg.data.split_code}")
-            create_experimental_dataset_from_metadata(src_datasets_root_dir, temp_dataset_path, cfg.data.custom_splits_dir, cfg.data.split_code)
-        else:                               # Partition with splits percentage ratios
-            train_split, val_split, test_split = [int(split * 100) for split in cfg.data.split_ratios]
-            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_{train_split}_{val_split}_{test_split}_seed{cfg.exp.seed}")
-            partition_dataset_by_ratio(src_dataset_path, temp_dataset_path, cfg.data.split_ratios, seed=cfg.exp.seed)
-
-    elif cfg.exp.mode == "crossval" or "crossval" in cfg.model.saved_model_folder:      # For cross-val experiement
-        if cfg.data.split_code:              # Partition with provided custom splits file
-            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{cfg.data.split_code}")
-            create_experimental_cv_dataset_from_metadata(src_datasets_root_dir, temp_dataset_path, cfg.data.custom_splits_dir, cfg.data.split_code)
-        elif cfg.data.use_replacement:       # with replacement
-            train_split, val_split, test_split = [int(split * 100) for split in cfg.data.split_ratios]
-            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_{train_split}_{val_split}_{test_split}_cv{cfg.data.num_folds}")
-            cv_partition_with_replacement(src_dataset_path, temp_dataset_path, cfg.data.split_ratios, cfg.data.num_folds, seed=cfg.exp.seed)
-        else:                               # without replacement
-            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_cv{cfg.data.num_folds}_seed{cfg.exp.seed}")
-            cv_partition_without_replacement(src_dataset_path, temp_dataset_path, cfg.data.num_folds, seed=cfg.exp.seed)
-            
-    # Add the path to the config
-    cfg.path.temp_dataset_path = temp_dataset_path
-
-    return cfg
-
 
 def dynamic_import(module_path, module_name):
     """Dynamically import a module given its path."""
@@ -113,10 +69,10 @@ def dynamic_import(module_path, module_name):
 @hydra.main(version_base=None, config_path="../configs", config_name="default_config")
 def main(config: DictConfig):
     """Main script entry point."""
-    cfg = preprocessing(config, debug=True)
+    config = preprocessing(config, debug=False)
 
     # Step 1: Prepare the dataset and update config
-    cfg = setup_dataset(cfg)
+    cfg = setup_dataset(config)
 
     # Step 2: Dynamically load the model script
     model_script_path = os.path.join("src", "models", f"{cfg.model.identifier}.py")
@@ -127,7 +83,6 @@ def main(config: DictConfig):
 
     # Step 3: Build the model
     model = model_module.build_model(cfg)
-    model.to(cfg.exp.device)
 
     # Step 4: Train or evaluate the model
     if cfg.exp.mode == "train":

@@ -11,77 +11,96 @@ helper = Helper()
 
 
 
-# Collate image-target pairs into a tuple.
-def collate_fn(batch):
-    return tuple(zip(*batch))
+def setup_dataset(cfg):
+    """
+    Set up the dataset for training, validation, and testing based on the configuration.
+
+    Args:
+        cfg (OmegaConf): The configuration object containing dataset and path details.
+
+    Returns:
+        str: Path to the prepared dataset directory.
+    """
+    # Extract dataset folder name and root directory from configuration
+    src_datasets_root_dir = cfg.path.dataset_root_dir
+    dataset_folder = cfg.data.folder
+
+    # Check if the dataset is already split into 'train' and 'val' subdirectories
+    dataset_path = os.path.join(src_datasets_root_dir, dataset_folder)
+    if dataset_splits_checker(dataset_path):
+        generate_yolo_labels_for_splits(dataset_path)
+        cfg.path.dataset_root_dir = dataset_path
+        return cfg
 
 
-# Dataset information class
-class DatasetInfo:
-    def __init__(self, dataset_path):
-        """
-        Initialize the DatasetInfo class by reading the dataset information from a JSON file.
+    # Define the source and temporary directory for datasets
+    src_dataset_path = os.path.join(src_datasets_root_dir, dataset_folder)
+    temp_datasets_root_dir = os.path.join(cfg.path.project_root_dir, cfg.path.input_dir, "temp_datasets")
 
-        Args:
-        - dataset_path: Dataset folder path
-        """
-        self.dataset_path = dataset_path
-        self.json_filepath = os.path.join(dataset_path, "dataset_info.json")
+    # Choose data partitions
 
-        self.label_dict = {}
-        self.reverse_label_dict = {}
-        self.imagename_to_id = {}
-        self.id_to_imagename = {}
+    if cfg.exp.mode == "train" or (cfg.model.saved_model_folder and ("train" in cfg.model.saved_model_folder or "fold" in cfg.model.saved_model_folder)):
+        if cfg.data.split_code:             # Partition with provided custom splits file
+            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{cfg.data.split_code}")
+            create_experimental_dataset_from_metadata(src_datasets_root_dir, temp_dataset_path, cfg.data.custom_splits_dir, cfg.data.split_code)
+        else:                               # Partition with splits percentage ratios
+            train_split, val_split, test_split = [int(split * 100) for split in cfg.data.split_ratios]
+            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_{train_split}_{val_split}_{test_split}_seed{cfg.exp.seed}")
+            partition_dataset_by_ratio(src_dataset_path, temp_dataset_path, cfg.data.split_ratios, seed=cfg.exp.seed)
 
-        # Load dataset info from JSON file and store in class variables
-        self._load_dataset_info()
+    elif cfg.exp.mode == "crossval" or "crossval" in cfg.model.saved_model_folder:      # For cross-val experiement
+        if cfg.data.split_code:              # Partition with provided custom splits file
+            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{cfg.data.split_code}")
+            create_experimental_cv_dataset_from_metadata(src_datasets_root_dir, temp_dataset_path, cfg.data.custom_splits_dir, cfg.data.split_code)
+        elif cfg.data.use_replacement:       # with replacement
+            train_split, val_split, test_split = [int(split * 100) for split in cfg.data.split_ratios]
+            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_{train_split}_{val_split}_{test_split}_cv{cfg.data.num_folds}")
+            cv_partition_with_replacement(src_dataset_path, temp_dataset_path, cfg.data.split_ratios, cfg.data.num_folds, seed=cfg.exp.seed)
+        else:                               # without replacement
+            temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{dataset_folder}_cv{cfg.data.num_folds}_seed{cfg.exp.seed}")
+            cv_partition_without_replacement(src_dataset_path, temp_dataset_path, cfg.data.num_folds, seed=cfg.exp.seed)
+            
+    # Add the path to the config
+    cfg.path.dataset_root_dir = temp_dataset_path
 
-    def _load_dataset_info(self):
-        """
-        Load the dataset info from a JSON file and populate class variables.
-        """
-        # Check if the dataset info file exists
-        if not os.path.exists(self.json_filepath):
-            raise FileNotFoundError(f"Dataset info file not found at: {self.json_filepath}")
+    return cfg
 
-        # Read the dataset info JSON file
-        with open(self.json_filepath, 'r') as f:
-            data = json.load(f)
 
-        # Read the label dictionary and image name-to-id mappings
-        self.label_dict = data['categories']
-        self.label_dict_yolo = {name: id-1 for name, id in data['categories'].items()}
-        self.imagename_to_id = data['image_id_map']
+def dataset_splits_checker(dataset_dir):
+    """
+    Check if a given dataset folder is split into 'train' and 'val' subdirectories.
 
-        # Reverse mappings for labels and image IDs
-        self.reverse_label_dict = {id: name for name, id in data['categories'].items()}
-        self.reverse_label_dict_yolo = {id-1: name for name, id in data['categories'].items()}
-        self.id_to_imagename = {id: name for name, id in data['image_id_map'].items()}
+    Args:
+        dataset_dir (str): Path to the dataset directory.
 
-    def get_label_dict(self):
-        """Return the label dictionary (categories)."""
-        return self.label_dict
+    Returns:
+        bool: True if both 'train' and 'val' folders exist, False otherwise.
+    """
+    train_exists = os.path.isdir(os.path.join(dataset_dir, 'train'))
+    val_exists = os.path.isdir(os.path.join(dataset_dir, 'val'))
+    return train_exists and val_exists
 
-    def get_label_dict_yolo(self):
-        """Return the label dictionary (categories) for yolo."""
-        return self.label_dict_yolo
-    
-    def get_reverse_label_dict(self):
-        """Return the reverse label dictionary (id to label)."""
-        return self.reverse_label_dict
+def generate_yolo_labels_for_splits(dataset_dir):
+    """
+    Generate YOLO formatted labels for the dataset in the given directory.
 
-    def get_reverse_label_dict_yolo(self):
-        """Return the reverse label dictionary (id to label) for yolo."""
-        return self.reverse_label_dict_yolo
-    
-    def get_imagename_to_id(self):
-        """Return the image name to id mapping."""
-        return self.imagename_to_id
+    Args:
+        dataset_dir (str): Path to the dataset directory.
+    """
 
-    def get_id_to_imagename(self):
-        """Return the image id to name mapping."""
-        return self.id_to_imagename
+    # Determine splits based on folders in the dataset directory (train, val, test)
+    splits = [d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d)) and d in ['train', 'val', 'test']]
+    for split in splits:
+        custom_labels_folder = os.path.join(dataset_dir, split, "custom_labels")
+        yolo_labels_folder = os.path.join(dataset_dir, split, "labels")
 
+        if not os.path.exists(yolo_labels_folder):
+            os.makedirs(yolo_labels_folder, exist_ok=True)
+            convert_custom_labels_yolo_labels(custom_labels_folder, yolo_labels_folder)
+
+    dataset_info_filepath = os.path.join(dataset_dir, "dataset_info.json")
+    dataset_info = helper.read_from_json(dataset_info_filepath)
+    create_yaml_from_dataset_info(dataset_dir, dataset_info, save_dir=dataset_dir, test_split=len(splits)>2)
 
 
 # Following functions are used for YOLO formatted labels
