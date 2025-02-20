@@ -36,9 +36,9 @@ train:
   optimizer: SGD                    # Optimization algorithm (options: ['SGD', 'Adam'])
   lr: 0.01                          # Initial learning rate
   momentum: 0.937                   # Momentum factor (applicable for SGD)
-  freeze_layers: 0                  # Number of backbone layers to freeze during training
   save_interval: -1                 # Interval for saving model checkpoints (A value of -1 disables this feature.)
   deterministic: true               # Helps improve reproducibility
+  workers: 2                        # Number of data loading workers
 
   # Learning Rate Scheduler Configuration
   scheduler:
