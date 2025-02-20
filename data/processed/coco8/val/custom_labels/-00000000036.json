@@ -1,0 +1,34 @@
+{
+    "asset": {
+        "name": "000000000036.jpg",
+        "image_id": 803131882,
+        "size": {
+            "width": 481,
+            "height": 640
+        }
+    },
+    "objects": [
+        {
+            "class": 26,
+            "boundingBox": {
+                "xmin": 0.0,
+                "ymin": 50.1196,
+                "xmax": 457.6801,
+                "ymax": 480.4697,
+                "width": 457.6801,
+                "height": 430.3501
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 167.5801,
+                "ymin": 162.8899,
+                "xmax": 478.1902,
+                "ymax": 628.0796,
+                "width": 310.6101,
+                "height": 465.1897
+            }
+        }
+    ]
+}

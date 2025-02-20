@@ -1,0 +1,111 @@
+{
+    "asset": {
+        "name": "000000000049.jpg",
+        "image_id": 115226610,
+        "size": {
+            "width": 381,
+            "height": 500
+        }
+    },
+    "objects": [
+        {
+            "class": 18,
+            "boundingBox": {
+                "xmin": 162.5702,
+                "ymin": 226.5599,
+                "xmax": 292.98,
+                "ymax": 410.9899,
+                "width": 130.4098,
+                "height": 184.4299
+            }
+        },
+        {
+            "class": 18,
+            "boundingBox": {
+                "xmin": 81.6999,
+                "ymin": 244.94,
+                "xmax": 165.4098,
+                "ymax": 403.14,
+                "width": 83.7098,
+                "height": 158.2
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 203.3898,
+                "ymin": 260.43,
+                "xmax": 269.0799,
+                "ymax": 333.4699,
+                "width": 65.6901,
+                "height": 73.0398
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 118.43,
+                "ymin": 261.32,
+                "xmax": 175.34,
+                "ymax": 324.25,
+                "width": 56.91,
+                "height": 62.93
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 119.3401,
+                "ymin": 334.21,
+                "xmax": 131.2801,
+                "ymax": 367.7799,
+                "width": 11.9399,
+                "height": 33.5699
+            }
+        },
+        {
+            "class": 59,
+            "boundingBox": {
+                "xmin": 201.7699,
+                "ymin": 426.19,
+                "xmax": 272.61,
+                "ymax": 473.42,
+                "width": 70.8401,
+                "height": 47.23
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 284.3398,
+                "ymin": 333.4,
+                "xmax": 295.2198,
+                "ymax": 360.83,
+                "width": 10.8799,
+                "height": 27.43
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 191.0001,
+                "ymin": 334.37,
+                "xmax": 198.1601,
+                "ymax": 357.78,
+                "width": 7.1599,
+                "height": 23.4099
+            }
+        },
+        {
+            "class": 1,
+            "boundingBox": {
+                "xmin": 346.76,
+                "ymin": 333.4,
+                "xmax": 361.56,
+                "ymax": 342.62,
+                "width": 14.8,
+                "height": 9.22
+            }
+        }
+    ]
+}
