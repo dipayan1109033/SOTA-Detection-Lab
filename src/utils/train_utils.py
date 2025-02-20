@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 
 from utils.setup_utils import *
 from utils.dataset_utils import DatasetInfo
-from utils.metrics_utils import Evaluation_withCOCO, writeTo_csv_for_crossval
+from utils.metrics_utils import Evaluation_withCOCO
+from utils.metrics_utils import draw_single_image_prediction, writeTo_csv_for_crossval
 
 
 def set_seeds(seed):
@@ -28,18 +29,6 @@ def set_seeds(seed):
 def collate_fn(batch):
     return tuple(zip(*batch))
      
-def check_for_cuda_device(device_str):
-    """Checks for device 'CUDA', else returns the provided option."""
-    if torch.cuda.is_available():
-        device = 'cuda'
-    elif device_str in ['cpu', 'mps']:
-        device = device_str
-    else:
-        raise ValueError(f"Config device ('{device_str}') is not valid")
-    print(f"Using device: {device}")
-    return device
-
-
 def get_new_folder_num(directory, prefix="train"):
     os.makedirs(directory, exist_ok=True)
 
@@ -105,9 +94,9 @@ def read_OmegaConfig(folder_path, filename="my_configs.yaml"):
     return config
 
 def get_exp_save_name(train_root_path):
-    args_filepath = os.path.join(train_root_path, "args.yaml")
-    data = helper.read_from_yaml(args_filepath)
-    exp_save_name = f"rs{data['seed']}_yolo11_{data['optimizer']}_b{data['batch']}_e{data['epochs']}_lr{data['lr0']}"
+    args_filepath = os.path.join(train_root_path, "my_configs.yaml")
+    config = helper.read_from_yaml(args_filepath)
+    exp_save_name = config['exp']['save_name']
     return exp_save_name
 
 
@@ -306,7 +295,8 @@ def save_predictions_forYOLO(cfg, results, val_output_path, dataset_dir, dataset
     image_list = helper.get_image_files(image_folder_path)
 
     dataset_info = DatasetInfo(dataset_dir)
-    reverse_label_dict_yolo = dataset_info.get_reverse_label_dict_yolo()
+    reverse_label_dict = dataset_info.get_reverse_label_dict()
+    #reverse_label_dict_yolo = dataset_info.get_reverse_label_dict_yolo()
     imagename_to_id_mapping = dataset_info.get_imagename_to_id()
 
     save_path = os.path.join(val_output_path, "predictions.json")
@@ -314,7 +304,7 @@ def save_predictions_forYOLO(cfg, results, val_output_path, dataset_dir, dataset
 
     custom_predictions = {}
     for pred in coco_predictions:
-        image_name = pred['image_id'] + extension
+        image_name = str(pred['image_id']) + extension
         image_id = imagename_to_id_mapping[image_name]
         category_id = pred['category_id']
         bbox = pred['bbox']
@@ -323,7 +313,7 @@ def save_predictions_forYOLO(cfg, results, val_output_path, dataset_dir, dataset
         # Prepare the custom object entry 
         aDetection = {
             "image_id": image_id,
-            "class": reverse_label_dict_yolo[category_id], 
+            "class": reverse_label_dict[category_id], 
             "score": score,
             "box": bbox 
         }
@@ -345,7 +335,8 @@ def save_predictions_forYOLO(cfg, results, val_output_path, dataset_dir, dataset
         "optimizer": cfg.train.optimizer,
         "exp_name": f"{cfg.model.identifier}_{cfg.exp.name}",
         "save_filename": cfg.exp.save_name,
-        "pretrained_model": cfg.model.pretrained_model
+        "weights": cfg.model.weights,
+        "saved_model_folder": cfg.model.saved_model_folder
     }
     custom_format = {
         'categories': dataset_info.get_label_dict(),
@@ -359,6 +350,60 @@ def save_predictions_forYOLO(cfg, results, val_output_path, dataset_dir, dataset
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
     helper.write_to_json(custom_format, output_filepath)
     return output_filepath
+
+
+def save_yolo_predictions_to_custom_labels(results, src_image_folder, output_folder_path, draw_scoreThreshold):
+    dest_image_folder, custom_label_folder = helper.create_subfolders(output_folder_path, ["images", "custom_labels"])
+
+    # Process the predictions
+    for idx, result in enumerate(results):
+        image_filename = os.path.basename(result.path)
+        height, width = result.orig_shape
+
+        # Initialize the custom labels structure
+        formatted_output = {
+            "asset": {
+                "name": image_filename,
+                "image_id": idx+1,
+                "size": {
+                    "width": width,
+                    "height": height
+                }
+            },
+            "objects": []
+        }
+        boxes = result.boxes.xyxy   # Bounding boxes (xmin, ymin, xmax, ymax)
+        labels = result.boxes.cls   # Class labels
+        scores = result.boxes.conf  # Get confidence scores
+
+        for i, box in enumerate(boxes):
+            xmin, ymin, xmax, ymax = map(lambda x: helper.truncate_float(x, decimals=4), box)
+            obj_class = int(labels[i])                # Class label
+            conf_score = round(float(scores[i]), 4)   # Convert to float
+
+            # Calculate width and height of the bounding box
+            bbox_width = helper.truncate_float(xmax - xmin, decimals=4) 
+            bbox_height = helper.truncate_float(ymax - ymin, decimals=4)
+
+            # Add the bounding box information to the output
+            formatted_output["objects"].append({
+                "class": obj_class,
+                "score": conf_score,
+                "boundingBox": {
+                    "xmin": xmin,
+                    "ymin": ymin,
+                    "xmax": xmax,
+                    "ymax": ymax,
+                    "width": bbox_width,
+                    "height": bbox_height
+                }
+            })
+
+        json_filepath = os.path.join(custom_label_folder, f"{os.path.splitext(image_filename)[0]}.json")
+        helper.write_to_json(formatted_output, json_filepath)
+
+        draw_single_image_prediction(json_filepath, src_image_folder, dest_image_folder, draw_scoreThreshold)
+
 
 
 def filter_predictions(all_predictions, confidence_threshold=0.0, iou_threshold=0.5):
@@ -444,7 +489,8 @@ def save_predictions(cfg, predictions, targets, dataset_dir, dataset_folder, sav
         "optimizer": cfg.train.optimizer,
         "exp_name": f"{cfg.model.identifier}_{cfg.exp.name}",
         "save_filename": cfg.exp.save_name,
-        "pretrained_model": cfg.model.pretrained_model
+        "weights": cfg.model.weights,
+        "saved_model_folder": cfg.model.saved_model_folder
     }
     custom_format = {
         'categories': dataset_info.get_label_dict(),
@@ -493,9 +539,9 @@ def plot_learning_curves(train_loss, valid_loss, model_identifier, save_root_dir
     plt.close()  # Close the figure to free memory
 
 
-def evaluate_predictions(dataset_dir, prediction_json_path, save_dir, model_identifier="yolo", csvFlag=True):
+def evaluate_predictions(dataset_dir, split, prediction_json_path, save_dir, model_identifier="yolo", csvFlag=True):
 
-    evalObj = Evaluation_withCOCO(dataset_dir, prediction_json_path, score_threshold=0.5)
+    evalObj = Evaluation_withCOCO(dataset_dir, split, prediction_json_path, score_threshold=0.5)
     evalObj.compute(save_dir, model_identifier, saveToCSV=csvFlag)
     
     evalObj.filter_coco_predictions(score_threshold=0.0)

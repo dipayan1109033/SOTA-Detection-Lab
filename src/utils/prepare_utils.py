@@ -10,18 +10,6 @@ helper = Helper()
 
 
 
-# Function to truncate float values without rounding
-def truncate_float(value, decimals=4):
-    """
-    Truncates a float to a specified number of decimal places without rounding.
-    
-    :param value: The float value to be truncated
-    :param decimals: Number of decimal places to keep
-    :return: Truncated float value
-    """
-    factor = 10.0 ** decimals
-    return int(value * factor) / factor
-
 # Function to generate unique image ID ensuring no duplicates
 def generate_unique_image_id(image_name, existing_ids):
     """

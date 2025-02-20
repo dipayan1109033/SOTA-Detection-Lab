@@ -19,9 +19,9 @@ model:
 # ----------------------------
 exp:
   seed: 42                          # Random seed for reproducibility
-  device: cuda                      # Computing device: ['cpu', 'mps', 'cuda']
+  device: mps                       # Computing device: ['cpu' or 'mps'], 'cuda' is automatically selected if available
   on_server: false                  # Whether the script is running on a server
-  mode: train                       # Running mode: ['train', 'crossval', 'test', 'predict']
+  mode: train                       # Running mode: ['train', 'evaluate', 'predict']
 
   number: 0                         # Experiment number for tracking different runs
   name: default                     # Experiment name for logging and model saving

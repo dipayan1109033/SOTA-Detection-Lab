@@ -13,6 +13,17 @@ from src.utils.common_utils import Helper
 helper = Helper()
 
 
+def check_for_cuda_device(device_str):
+    """Checks for device 'CUDA', else returns the provided option."""
+    if torch.cuda.is_available():
+        device = 'cuda'
+    elif device_str == 'mps' and torch.backends.mps.is_available():
+        device = 'mps'
+    else:
+        device = 'cpu'
+
+    print(f"Using device: {device}")
+    return device
 
 def set_seeds(seed, deterministic=True):
     """Sets random seeds for reproducibility with optional determinism."""
@@ -83,14 +94,17 @@ def main(config: DictConfig):
 
     # Step 3: Build the model
     model = model_module.build_model(cfg)
+    cfg.exp.device = check_for_cuda_device(cfg.exp.device)
 
     # Step 4: Train or evaluate the model
     if cfg.exp.mode == "train":
         model_module.train_model(model, cfg)
     elif cfg.exp.mode == "evaluate":
         model_module.evaluate_model(model, cfg)
+    elif cfg.exp.mode == "predict":
+        model_module.predict(model, cfg)
     else:
-        raise ValueError("Invalid task. Choose 'train' or 'evaluate'.")
+        raise ValueError("Invalid task. Choose 'train' or 'evaluate' or 'predict'.")
 
 if __name__ == "__main__":
     main()

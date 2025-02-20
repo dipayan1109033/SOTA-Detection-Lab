@@ -183,20 +183,20 @@ def convert_a_yolo_label_to_custom_json(image_path, yolo_label_path, image_id):
         class_id, x_center, y_center, bbox_width, bbox_height = map(float, parts)
         
         # Convert YOLO normalized coordinates to absolute coordinates
-        xmin = truncate_float((x_center - bbox_width / 2) * image_width, 4)
-        ymin = truncate_float((y_center - bbox_height / 2) * image_height, 4)
-        xmax = truncate_float((x_center + bbox_width / 2) * image_width, 4)
-        ymax = truncate_float((y_center + bbox_height / 2) * image_height, 4)
+        xmin = helper.truncate_float((x_center - bbox_width / 2) * image_width, 4)
+        ymin = helper.truncate_float((y_center - bbox_height / 2) * image_height, 4)
+        xmax = helper.truncate_float((x_center + bbox_width / 2) * image_width, 4)
+        ymax = helper.truncate_float((y_center + bbox_height / 2) * image_height, 4)
         
         objects.append({
-            "class": int(class_id),
+            "class": int(class_id) + 1,
             "boundingBox": {
                 "xmin": xmin,
                 "ymin": ymin,
                 "xmax": xmax,
                 "ymax": ymax,
-                "width": truncate_float(xmax - xmin, 4),
-                "height": truncate_float(ymax - ymin, 4)
+                "width": helper.truncate_float(xmax - xmin, 4),
+                "height": helper.truncate_float(ymax - ymin, 4)
             }
         })
     
@@ -214,6 +214,7 @@ def convert_a_yolo_label_to_custom_json(image_path, yolo_label_path, image_id):
     }
     
     return json_data
+
 
 # Function to convert an entire YOLO dataset to a custom JSON format
 def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
@@ -235,7 +236,6 @@ def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
     # Convert class mapping to desired format (incrementing each id by 1)
     categories = {class_name: int(class_id) + 1 for class_id, class_name in class_map.items()}
 
-    image_id_map = {}
     existing_ids = set()
 
     # Determine splits based on folders in the dataset directory (train, val, test)
@@ -251,7 +251,7 @@ def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
         os.makedirs(custom_labels_dir, exist_ok=True)
         
         # Iterate over image files
-        for image_name in os.listdir(images_dir):
+        for image_name in helper.get_image_files(images_dir):
             image_path = os.path.join(images_dir, image_name)
             if not os.path.isfile(image_path):
                 print(f"Skipping {image_name} as it is not a file.")
@@ -259,7 +259,6 @@ def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
 
             # Generate unique image ID
             image_id = generate_unique_image_id(image_name, existing_ids)
-            image_id_map[image_name] = image_id
             
             # Locate corresponding YOLO label file
             label_file = os.path.join(labels_dir, os.path.splitext(image_name)[0] + ".txt")
@@ -274,30 +273,64 @@ def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
 
     # Save dataset metadata with class mappings and image IDs
     dataset_info_file = os.path.join(dataset_dir, "dataset_info.json")
-    helper.write_to_json({"categories": categories, "image_id_map": image_id_map}, dataset_info_file)
+    helper.write_to_json({"categories": categories}, dataset_info_file)
 
     print(f"🎉 Dataset conversion completed. Metadata saved to {dataset_info_file}")
 
+def update_image_and_label_filenames(image_path, label_path, images_dir, labels_dir):
+    """Renames destination image and corresponding label if the image filename starts with '0', replacing it with '-'."""
+    base_name, ext = os.path.splitext(os.path.basename(image_path))
+    if not base_name.startswith('0'):
+        return image_path, label_path
 
-def copy_custom_dataset(src_dir, dest_dir):
+    new_base = '-' + base_name[1:]
+    new_image_path = os.path.join(images_dir, new_base + ext)
+    new_label_path = os.path.join(labels_dir, new_base + ".json")
+
+    return new_image_path, new_label_path
+
+def get_image_id(label_path):
+    """Extract the image ID from reading the the custom label file."""
+    custom_data = helper.read_from_json(label_path)
+    return custom_data['asset']['image_id']
+
+def copy_custom_dataset(src_dir, dest_dir, img_ext='.jpg'):
     """Copy the custom labels with images to the processed data directory."""
 
     # Determine splits based on folders in the dataset directory (train, val, test)
     splits = [d for d in os.listdir(src_dir) if os.path.isdir(os.path.join(src_dir, d)) and d in ['train', 'val', 'test']]
 
+    image_id_map = {}
     for split in splits:
-        images_dir = os.path.join(src_dir, split, 'images')
-        labels_dir = os.path.join(src_dir, split, 'custom_labels')
-        dest_images_dir = os.path.join(dest_dir, split, 'images')
-        dest_labels_dir = os.path.join(dest_dir, split, 'custom_labels')
+        src_split_dir = os.path.join(src_dir, split)
+        dest_split_dir = os.path.join(dest_dir, split)
+        src_images_dir, src_labels_dir = helper.get_subfolder_paths(src_split_dir, ['images', 'custom_labels'])
+        dest_images_dir, dest_labels_dir = helper.create_subfolders(dest_split_dir, ['images', 'custom_labels'])
 
         # Copy images and labels
-        shutil.copytree(images_dir, dest_images_dir, dirs_exist_ok=True)
-        shutil.copytree(labels_dir, dest_labels_dir, dirs_exist_ok=True)
+        counter = 0
+        for label_file in helper.get_files_with_extension(src_labels_dir, '.json'):
+            label_path = os.path.join(src_labels_dir, label_file)
+            image_path = os.path.join(src_images_dir, os.path.splitext(label_file)[0] + img_ext)
+            if not os.path.exists(image_path):
+                print(f"Image not found for label: {label_file}")
+                continue
 
-        # Copy the dataset info file
-        shutil.copy2(os.path.join(src_dir, "dataset_info.json"), dest_dir)
+            # Update image and label filenames if necessary
+            new_image_path, new_label_path = update_image_and_label_filenames(image_path, label_path, dest_images_dir, dest_labels_dir)
 
+            # Copy image and label to destination
+            shutil.copy2(image_path, new_image_path)
+            shutil.copy2(label_path, new_label_path)
+            image_id_map[os.path.basename(new_image_path)] = get_image_id(new_label_path)
+            counter += 1
+
+        print(f"Copied {counter} images and labels to {split} split.")
+
+    # Create the dataset info file with image_id_map and categories
+    categories = helper.read_from_json(os.path.join(src_dir, "dataset_info.json"))['categories']
+    dataset_info = {"categories": categories, "image_id_map": image_id_map}
+    helper.write_to_json(dataset_info, os.path.join(dest_dir, "dataset_info.json"))
     print(f"Dataset copied to: {dest_dir}")
 
 
@@ -314,7 +347,7 @@ def convert_yolo_custom_dataset(src_dataset_dir):
 
     # Copy the restructured dataset to the processed data directory
     dest_dataset_dir = os.path.join(processed_data_dir, dataset_name)
-    copy_custom_dataset(raw_dataset_dir, dest_dataset_dir)
+    copy_custom_dataset(raw_dataset_dir, dest_dataset_dir, img_ext='.jpg')
 
 
 
@@ -397,14 +430,14 @@ def check_dataset_consistency(dataset_dir, splits = ['train', 'val']):
 def main():
 
     # Define the dataset directory
-    yolo_dataset_dir = "/Volumes/Works/Projects/datasets/coco128" # coco8, coco128
+    yolo_dataset_dir = "/Volumes/Works/Projects/datasets/coco8" # coco8, coco128
     #yolo_dataset_dir = "data/raw/VOC2007" 
 
     #convert_yolo_custom_dataset(yolo_dataset_dir)
 
 
     dataset_dir = "data/processed/coco128"
-    check_dataset_consistency(dataset_dir)
+    #check_dataset_consistency(dataset_dir)
 
 
 if __name__ == "__main__":

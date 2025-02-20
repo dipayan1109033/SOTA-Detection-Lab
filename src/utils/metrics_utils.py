@@ -70,6 +70,54 @@ def writeTo_csv_for_crossval(metrics_dict, score_threshold, prediction_json_path
     return coco_avg, coco_std
 
 
+def draw_single_image_prediction(json_file, image_folder, output_folder, score_threshold=0.5):
+    """
+    Draws bounding boxes from a prediction JSON on a single image and saves it to an output folder.
+
+    Args:
+        json_file (str): Path to the JSON file containing predictions for one image.
+        image_folder (str): Path to the folder containing the input image.
+        output_folder (str): Path to the folder where the output image will be saved.
+        score_threshold (float): Minimum confidence score to draw a bounding box.
+    """
+    # Create output directory if it doesn't exist
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Load prediction JSON
+    data = helper.read_from_json(json_file)
+
+    # Get image name from JSON
+    image_name = data["asset"]["name"]
+    image_path = os.path.join(image_folder, image_name)
+
+    if not os.path.exists(image_path):
+        print(f"Image not found: {image_path}")
+        return
+
+    # Read image
+    image = cv2.imread(image_path)
+
+    # Iterate over predicted objects
+    for obj in data["objects"]:
+        score = obj["score"]
+        if score >= score_threshold:
+            bbox = obj["boundingBox"]
+            xmin, ymin = int(bbox["xmin"]), int(bbox["ymin"])
+            xmax, ymax = int(bbox["xmax"]), int(bbox["ymax"])
+            class_id = obj["class"]
+
+            # Draw rectangle
+            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+
+            # Label with class and score
+            label = f"Class {class_id}: {score:.2f}"
+            top = ymin - 10 if ymin > 30 else ymin + 25
+            cv2.putText(image, label, (xmin+5, top), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
+    # Save the image with bounding boxes
+    output_image_path = os.path.join(output_folder, image_name)
+    cv2.imwrite(output_image_path, image)
+
 
 def plot_precision_vs_recall_curve(results, title ="Precision-Recall Curve", legend=None, showAP=True, json_path=None):
     """
@@ -108,6 +156,8 @@ def plot_precision_vs_recall_curve(results, title ="Precision-Recall Curve", leg
             plt.savefig(save_filepath)
         else:
             plt.show()
+
+        plt.close()
 
 
 class Evaluation_withCOCO:
@@ -337,7 +387,7 @@ class Evaluation_withCOCO:
         rs = {'count':classes_count, 'GTs': groundTruths, 'DETs':totalDetections, 'TPs': int(TPs), 'FPs': int(FPs), 'precision': precision, 'recall': recall, 'f1_score': f1_score, 'AP50': coco_AP50, 'AP75': coco_AP75, 'AP': coco_AP}
 
         # Print results to console
-        print(f"Object classes: {list(pascal_metrics['per_class'].keys())} scoreTh={self.score_threshold}")
+        print(f"Number of classes: {len(pascal_metrics['per_class'])} scoreTh={self.score_threshold}")
         print("total_GTs   total_DETs     TP_count    FP_count    Precision    Recall    F1_Score  |   AP50      AP75      AP")
         print(f" {rs['GTs']:5d}  {rs['DETs']:10d}  {rs['TPs']: 13d}  {rs['FPs']:10d}  {rs['precision']:11.2f}   {rs['recall']:9.2f}  {rs['f1_score']:9.2f}  {rs['AP50']:10.2f}    {rs['AP75']:6.2f}    {rs['AP']:6.2f}\n")
 

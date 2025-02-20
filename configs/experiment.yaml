@@ -1,3 +1,12 @@
+
+# ----------------------------
+# Experiment Configuration
+# ----------------------------
+exp:
+  mode: predict                       # Running mode: ['train', 'evaluate', 'predict']
+  name: default                     # Experiment name for logging and model saving
+
+
 # ----------------------------
 # Dataset Configuration
 # ----------------------------
@@ -22,7 +31,6 @@ data:
 # Training Configuration
 # ----------------------------
 train:
-  deterministic: true               # Helps improve reproducibility
   epoch: 3                          # Number of training epochs
   batch_size: 8                     # Number of samples per batch
   optimizer: SGD                    # Optimization algorithm (options: ['SGD', 'Adam'])
@@ -30,6 +38,7 @@ train:
   momentum: 0.937                   # Momentum factor (applicable for SGD)
   freeze_layers: 0                  # Number of backbone layers to freeze during training
   save_interval: -1                 # Interval for saving model checkpoints (A value of -1 disables this feature.)
+  deterministic: true               # Helps improve reproducibility
 
   # Learning Rate Scheduler Configuration
   scheduler:
