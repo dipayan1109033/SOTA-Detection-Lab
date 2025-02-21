@@ -1,0 +1,10 @@
+# ----------------------------
+# Faster RCNN Model-Specific Configuration
+# ----------------------------
+identifier: detr           # Model name identifier (used for selecting this configuration)
+weights: 'facebook/detr-resnet-50'  # Pretrained weights file
+
+img_size: 640                     # Input image size for the model (typically 416, 512, or 640)
+freeze_layers: 0                  # Number of backbone layers to freeze during training
+save_interval: -1                 # Interval for saving model checkpoints (A value of -1 disables this feature.)
+workers: 1                        # Number of data loading workers
