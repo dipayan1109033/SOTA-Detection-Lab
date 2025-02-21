@@ -1,8 +1,6 @@
 import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import yaml
-import json
 import shutil
 from PIL import Image
 from src.utils.prepare_utils import *
@@ -215,7 +213,6 @@ def convert_a_yolo_label_to_custom_json(image_path, yolo_label_path, image_id):
     
     return json_data
 
-
 # Function to convert an entire YOLO dataset to a custom JSON format
 def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
     """
@@ -277,23 +274,32 @@ def convert_yolo_dataset_labels(dataset_dir, class_map=None, debug=False):
 
     print(f"🎉 Dataset conversion completed. Metadata saved to {dataset_info_file}")
 
+
+
+# Function to update image and label filenames
 def update_image_and_label_filenames(image_path, label_path, images_dir, labels_dir):
     """Renames destination image and corresponding label if the image filename starts with '0', replacing it with '-'."""
+    label_data = helper.read_from_json(label_path)
     base_name, ext = os.path.splitext(os.path.basename(image_path))
     if not base_name.startswith('0'):
-        return image_path, label_path
+        return image_path, label_path, label_data
 
     new_base = '-' + base_name[1:]
     new_image_path = os.path.join(images_dir, new_base + ext)
     new_label_path = os.path.join(labels_dir, new_base + ".json")
 
-    return new_image_path, new_label_path
+    # Update image name in label data
+    label_data['asset']['name'] = new_base + ext
 
+    return new_image_path, new_label_path, label_data
+
+# Function to get unique image ID
 def get_image_id(label_path):
     """Extract the image ID from reading the the custom label file."""
     custom_data = helper.read_from_json(label_path)
     return custom_data['asset']['image_id']
 
+# Function to copy custom dataset to processed data directory
 def copy_custom_dataset(src_dir, dest_dir, img_ext='.jpg'):
     """Copy the custom labels with images to the processed data directory."""
 
@@ -317,11 +323,15 @@ def copy_custom_dataset(src_dir, dest_dir, img_ext='.jpg'):
                 continue
 
             # Update image and label filenames if necessary
-            new_image_path, new_label_path = update_image_and_label_filenames(image_path, label_path, dest_images_dir, dest_labels_dir)
+            new_image_path, new_label_path, label_data = update_image_and_label_filenames(image_path, label_path, dest_images_dir, dest_labels_dir)
 
-            # Copy image and label to destination
+            # Copy image to destination
             shutil.copy2(image_path, new_image_path)
-            shutil.copy2(label_path, new_label_path)
+
+            # Write label to destination
+            helper.write_to_json(label_data, new_label_path)
+
+            # Update image_id_map
             image_id_map[os.path.basename(new_image_path)] = get_image_id(new_label_path)
             counter += 1
 
@@ -353,77 +363,6 @@ def convert_yolo_custom_dataset(src_dataset_dir):
 
 
 
-def check_dataset_consistency(dataset_dir, splits = ['train', 'val']):
-    """
-    Checks the consistency of a dataset that is structured into train and val splits,
-    where each split has 'images' and 'labels' subdirectories.
-
-    Expected folder structure:
-    
-        dataset_dir/
-        ├── train/
-        │     ├── images/
-        │     └── labels/
-        └── val/
-              ├── images/
-              └── labels/
-    
-    For each split, the function compares the base filenames (without extensions)
-    in the images and labels folders and prints out the files that are missing in one
-    folder but present in the other.
-
-    Args:
-        dataset_dir (str): Path to the dataset directory.
-        splits (list): List of split names to check (default: ['train', 'val']).
-    
-    Returns:
-        dict: A dictionary where keys are the split names ('train', 'val') and the values
-              are tuples (missing_images, missing_labels). 'missing_images' is a set of base
-              filenames that are in labels but missing in images, and 'missing_labels' is a set
-              of base filenames that are in images but missing in labels.
-    """
-    results = {}
-
-    for split in splits:
-        split_dir = os.path.join(dataset_dir, split)
-        images_folder = os.path.join(split_dir, "images")
-        labels_folder = os.path.join(split_dir, "custom_labels")
-        
-        if not os.path.isdir(images_folder):
-            raise FileNotFoundError(f"'images' folder not found in {split_dir}")
-        if not os.path.isdir(labels_folder):
-            raise FileNotFoundError(f"'labels' folder not found in {split_dir}")
-
-        # Get base filenames (without extensions)
-        image_names = {os.path.splitext(f)[0] for f in os.listdir(images_folder)
-                       if os.path.isfile(os.path.join(images_folder, f))}
-        label_names = {os.path.splitext(f)[0] for f in os.listdir(labels_folder)
-                       if os.path.isfile(os.path.join(labels_folder, f))}
-        
-        # Determine mismatches:
-        missing_images = label_names - image_names   # Files in labels missing in images
-        missing_labels = image_names - label_names     # Files in images missing in labels
-        
-        # Print the results for this split
-        print(f"--- {split.upper()} SPLIT ---")
-        if missing_images:
-            print("Files present in labels but missing in images:")
-            for name in missing_images:
-                print("  ", name)
-        else:
-            print("No missing images (all labels have corresponding images).")
-        
-        if missing_labels:
-            print("Files present in images but missing in labels:")
-            for name in missing_labels:
-                print("  ", name)
-        else:
-            print("No missing labels (all images have corresponding labels).")
-        
-        print("\n")
-        results[split] = (missing_images, missing_labels)
-    
-    return results
 
 
 
@@ -433,11 +372,9 @@ def main():
     yolo_dataset_dir = "/Volumes/Works/Projects/datasets/coco8" # coco8, coco128
     #yolo_dataset_dir = "data/raw/VOC2007" 
 
-    #convert_yolo_custom_dataset(yolo_dataset_dir)
+    convert_yolo_custom_dataset(yolo_dataset_dir)
 
 
-    dataset_dir = "data/processed/coco128"
-    #check_dataset_consistency(dataset_dir)
 
 
 if __name__ == "__main__":
