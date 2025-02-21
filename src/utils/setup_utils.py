@@ -38,7 +38,6 @@ def setup_dataset(cfg):
     temp_datasets_root_dir = os.path.join(cfg.path.project_root_dir, cfg.path.input_dir, "temp_datasets")
 
     # Choose data partitions
-
     if cfg.exp.mode == "train" or (cfg.model.saved_model_folder and ("train" in cfg.model.saved_model_folder or "fold" in cfg.model.saved_model_folder)):
         if cfg.data.split_code:             # Partition with provided custom splits file
             temp_dataset_path = os.path.join(temp_datasets_root_dir, f"{cfg.data.split_code}")
@@ -101,6 +100,7 @@ def generate_yolo_labels_for_splits(dataset_dir):
     dataset_info_filepath = os.path.join(dataset_dir, "dataset_info.json")
     dataset_info = helper.read_from_json(dataset_info_filepath)
     create_yaml_from_dataset_info(dataset_dir, dataset_info, save_dir=dataset_dir, test_split=len(splits)>2)
+
 
 
 # Following functions are used for YOLO formatted labels

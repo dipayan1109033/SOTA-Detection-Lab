@@ -1,83 +1,90 @@
-# 🚀 SOTA-Detection-Lab: A Flexible Object Detection Fine-Tuning Framework
+# 🚀 SOTA-Detection-Lab: A Flexible Framework for Object Detection Training
 
-**SOTA-Detection-Lab** is a **PyTorch-based** framework for training, fine-tuning, and evaluating **state-of-the-art object detection models** on **custom datasets**. It supports Faster R-CNN, YOLO, CenterNet, EfficientDet, DETR, and more, with **independent training scripts** and **Hydra-based configuration** to switch models effortlessly for fast experimentation.
+**SOTA-Detection-Lab** is a **PyTorch-based** framework designed for training, fine-tuning, and evaluating **state-of-the-art object detection models** on **custom datasets**. It supports models like **YOLO**, **Faster R-CNN**, **DETR**, with upcoming additions (e.g., **CenterNet**, **EfficientDet**), and offers **independent training scripts** along with **Hydra-based configuration** for seamless model switching and rapid experimentation.
 
 ## 📌 Key Features
-- ✅ **Easily switch between multiple object detection models** (Faster R-CNN, YOLOv5, CenterNet, EfficientDet, DETR, etc.).
-- ✅ **Independent training scripts** – no forced dependency on large frameworks like Detectron2 or MMDetection.
-- ✅ **Flexible configuration using Hydra** – customize models, datasets, and hyperparameters easily.
-- ✅ **Supports fine-tuning on custom datasets** with minimal setup.
-- ✅ **Unified dataset handling** – supports COCO, Pascal VOC, and custom datasets.
-- ✅ **Modular structure** – extend and add new models easily.
+- ✅ **Effortless model switching** – train **YOLO**, **Faster R-CNN**, **DETR**, and more with simple configuration changes.  
+- ✅ **Standalone training scripts** – no reliance on heavy frameworks like **Detectron2** or **MMDetection**.  
+- ✅ **Hydra-powered configuration** – easily customize models, datasets, and hyperparameters.  
+- ✅ **Fine-tune on custom datasets** with minimal setup and overhead.  
+- ✅ **Unified dataset handling** – a consistent dataset format for all supported models.  
+- ✅ **Modular architecture** – easily extend and integrate new models or components.  
 
 ---
+
 
 ## 📂 Project Structure
 
 ```plaintext
 SOTA-DETECTION-LAB/
 │
-├── configs/                           # Configuration files
-│   ├── model/                         # Model-specific configs
-│   │   ├── centernet.yaml
-│   │   ├── detr.yaml
-│   │   ├── faster_rcnn.yaml
-│   │   └── yolo.yaml
-│   ├── default_config.yaml            # Global/default configuration
-│   └── experiment.yaml                # Experiment-specific configuration
+├── configs/                           # Configuration files for models and experiments
+│   ├── model/                         # Model-specific configuration files
+│   │   ├── detr.yaml                  # Config for DETR model
+│   │   ├── faster_rcnn.yaml           # Config for Faster R-CNN model
+│   │   └── yolo.yaml                  # Config for YOLO model
+│   ├── default_config.yaml            # Global/default settings for the project
+│   └── experiment.yaml                # Settings specific to a particular experiment
 │
-├── data/                              # Datasets
-│   ├── coco8/
-│   ├── coco128/
-│   └── VOC2007/
+├── data/                              # Dataset storage
+│   ├── raw/                           # Unprocessed, original datasets
+│   └── processed/                     # Preprocessed datasets ready for use
+│       ├── coco8/                     # Example of a processed dataset (custom format)
+│       └── ...                        # Additional processed datasets
 │
-├── experiments/                       # Experiment data
-│   ├── input/                         # Input files for experiments
-│   └── output/                        # Output files (logs, results, checkpoints)
+├── experiments/                       # Experiment-related data
+│   ├── input/                         # Files used as input during experiments
+│   └── output/                        # Outputs from experiments (e.g., logs, results, checkpoints)
 │
-├── results/                           # Final results or evaluation outputs
+├── results/                           # Final evaluation results and reports
 │
 ├── src/                               # Source code
-│   ├── data_prep/                     # Data preparation and preprocessing scripts
-│   │   ├── convert_dataset_formats.py # Convert between dataset formats (e.g., COCO to Pascal VOC)
-│   │   └── preprocess.py              # Preprocessing routines
+│   ├── data_prep/                     # Scripts for dataset preparation and preprocessing
+│   │   ├── convert_formats.py         # Convert datasets to custom formats
+│   │   └── check_format.py            # Validate and check custom dataset
 │   │
-│   ├── datasets/                      # Dataset processing utilities
-│   │   ├── dataset_loader.py          # Unified dataset loader
-│   │   └── transforms.py              # Data augmentation and preprocessing
+│   ├── datasets/                      # Dataset utility functions
+│   │   └── transforms.py              # Data augmentation and preprocessing utilities
 │   │
 │   ├── models/                        # Model implementations
-│   │   ├── centernet.py               # CenterNet model
-│   │   ├── faster_rcnn.py             # Faster R-CNN model
-│   │   └── yolo.py                    # YOLO model
+│   │   ├── detr.py                    # DETR model implementation
+│   │   ├── faster_rcnn.py             # Faster R-CNN implementation
+│   │   └── yolo.py                    # YOLO model implementation
 │   │
-│   ├── utils/                         # Utility scripts
-│   │   ├── common_utils.py            # General helper functions
-│   │   ├── prepare_utils.py           # Raw dataset preprocess related utilities
-│   │   ├── dataset_utils.py           # TorchVision Dataset, Dataloader-related utilities
-│   │   ├── setup_utils.py             # Experimental Dataset Setup related
-│   │   ├── train_utils.py             # Training utilities (loops, schedulers, etc.)
-│   │   └── metrics_utils.py           # Evaluation, metrics computation, and reporting
+│   ├── utils/                         # General-purpose utility scripts
+│   │   ├── common_utils.py            # Helper functions used across the project
+│   │   ├── prepare_utils.py           # Utilities for dataset preprocessing
+│   │   ├── dataset_utils.py           # TorchVision Dataset and DataLoader helpers
+│   │   ├── setup_utils.py             # Tools for setting up experimental datasets
+│   │   ├── train_utils.py             # Training loop helpers, schedulers, etc.
+│   │   └── metrics_utils.py           # Functions for evaluation metrics and reporting
 │   │
-│   └── main.py                        # Main entry point for running experiments
+│   └── main.py                        # Main script to run training and evaluation
 │
-├── venv39/                            # Python virtual environment
+├── venv39/                            # Python 3.9 virtual environment for package management
 │
-├── .gitignore                         # Git ignore rules
-├── LICENSE                            # License file
-└── README.md                          # Project documentation
-
+├── requirements.txt                   # List of dependencies for the project
+├── .gitignore                         # Specifies files and directories to ignore in Git
+├── LICENSE                            # License information for the project
+└── README.md                          # Overview, setup instructions, and usage guide
 ```
 
 
 
 ## 📖 Setup & Installation
 
-### **1️⃣ Clone the Repository**
+### **1️⃣ Clone the Repositories**
 
 ```bash
 git clone https://github.com/dipayan1109033/SOTA-Detection-Lab.git
 cd SOTA-Detection-Lab
+```
+
+To facilitate the calculation of object detection metrics, clone the following repository inside the `src/utils` directory:
+
+```bash
+cd src/utils
+git clone https://github.com/dipayan1109033/calculate_ODmetrics
 ```
 
 ### **2️⃣ Install Dependencies**
@@ -93,27 +100,29 @@ pip install -r requirements.txt
 
 ## 🚀 Usage
 
-
 ### 🔹 Training a Model
 
-To train a model, specify the model name and dataset:
-
-
-```bash
-python main.py task=train model=faster_rcnn dataset=coco training.epochs=30
-```
-
-Example for CenterNet:
+To train a YOLO model on the `coco8` dataset:
 
 ```bash
-python main.py task=train model=centernet dataset=custom training.epochs=50
+python src/main.py model="yolo" exp.mode="train" data.folder="coco8" exp.name="yolo_with_coco8"
 ```
 
 ### 🔹 Evaluating a Model
+
+To evaluate a trained YOLO model using the validation split:
+
 ```bash
-python main.py task=evaluate model=efficientdet dataset=pascal_voc
+python src/main.py model="yolo" exp.mode="evaluate" data.folder="coco8" data.test_split="val" model.saved_model_folder="train1" exp.name="train1_evaluate_coco8_val"
 ```
 
+### 🔹 Making Predictions
+
+To make predictions on new images using a trained YOLO model:
+
+```bash
+python src/main.py model="yolo" exp.mode="predict" model.saved_model_folder="train1" exp.name="train1_predict_coco8_val" path.predict_image_folder="data/processed/coco8/val/images"
+```
 
 
 
@@ -124,14 +133,15 @@ To add a new model, follow these steps:
 1. Create a new script in the `models/` folder, e.g., `models/my_model.py`.
 2. Implement three functions:
    - `build_model(cfg)`: Loads and returns the model.
-   - `train_model(model, dataloader, cfg)`: Implements training logic.
-   - `evaluate_model(model, dataloader, cfg)`: Implements evaluation logic.
+   - `train_model(model, cfg)`: Implements training logic.
+   - `evaluate_model(model, cfg)`: Implements evaluation logic.
+   - `predict(model, cfg)`: Implements prediction logic.
 3. Create a configuration file under `configs/models/my_model.yaml`.
 
 After that, you can run:
 
-```sh
-python main.py task=train model=my_model dataset=coco training.epochs=20
+```bash
+python src/main.py model="my_model" exp.mode="train" data.folder="coco8" exp.name="my_model_with_coco8"
 ```
 
 
@@ -141,11 +151,8 @@ python main.py task=train model=my_model dataset=coco training.epochs=20
 
 | Model         | Source          | Framework                        |
 |--------------|----------------|----------------------------------|
+| YOLO         | Ultralytics     | PyTorch                          |
 | Faster R-CNN | Torchvision     | PyTorch                          |
-| YOLOv5       | Ultralytics     | PyTorch                          |
-| YOLOv8       | Ultralytics     | PyTorch                          |
-| CenterNet    | GitHub Repo     | PyTorch                          |
-| EfficientDet | GitHub Repo     | TensorFlow (converted to PyTorch) |
 | DETR         | GitHub Repo     | PyTorch                          |
 
 
@@ -160,13 +167,13 @@ This project is licensed under the MIT License.
 ## ⭐ Acknowledgements
 
 - [PyTorch](https://pytorch.org/)
-- [Ultralytics YOLO](https://github.com/ultralytics/yolov5)
-- [DETR](https://github.com/facebookresearch/detectron2)
-- [Albumentations](https://albumentations.ai/)
+- [Ultralytics YOLO](https://docs.ultralytics.com/)
+- [DETR](https://huggingface.co/facebook/detr-resnet-50)
 
 ---
 
 ## Contact
 
 For any inquiries or suggestions, please contact [dipayan1109033@gmail.com].
+
 
