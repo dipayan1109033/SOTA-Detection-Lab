@@ -12,7 +12,7 @@ exp:
 # ----------------------------
 data:
   folder: coco8                    # Name of the dataset folder (relative to dataset_root_dir)
-  single_class: true               # If true, treats the dataset as a single-class detection task
+  single_class: false               # If true, treats the dataset as a single-class detection task
 
   # Dataset Splitting
   split_ratios: [0.8, 0.2, 0.0]    # Ratios for train, validation, and test splits (should sum to 1.0)
@@ -36,9 +36,7 @@ train:
   optimizer: SGD                    # Optimization algorithm (options: ['SGD', 'Adam'])
   lr: 0.01                          # Initial learning rate
   momentum: 0.937                   # Momentum factor (applicable for SGD)
-  save_interval: -1                 # Interval for saving model checkpoints (A value of -1 disables this feature.)
   deterministic: true               # Helps improve reproducibility
-  workers: 1                        # Number of data loading workers
 
   # Learning Rate Scheduler Configuration
   scheduler:

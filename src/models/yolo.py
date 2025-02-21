@@ -45,9 +45,9 @@ def train_model(model, cfg):
                 project=train_root_dir, 
                 name=f"train{cfg.exp.number}", 
                 freeze=cfg.model.freeze_layers,
-                save_period=cfg.train.save_interval,
-                device=cfg.exp.device,
-                workers=cfg.train.workers
+                save_period=cfg.model.save_interval,
+                workers=cfg.model.workers,
+                device=cfg.exp.device
                 )
     
     # Save config arguments

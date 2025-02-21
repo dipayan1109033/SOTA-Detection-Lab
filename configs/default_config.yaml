@@ -8,24 +8,29 @@ defaults:
 
 
 # ----------------------------
-# Model Configuration
-# ----------------------------
-model: 
-  saved_model_folder: null        # Save folder name for a previously trained model (set dynamically)
-
-
-# ----------------------------
 # Experiment Configuration
 # ----------------------------
 exp:
   seed: 42                          # Random seed for reproducibility
   device: mps                       # Computing device: ['cpu' or 'mps'], 'cuda' is automatically selected if available
   on_server: false                  # Whether the script is running on a server
-  mode: train                       # Running mode: ['train', 'evaluate', 'predict']
 
-  number: 0                         # Experiment number for tracking different runs
+  mode: train                       # Running mode: ['train', 'evaluate', 'predict']
   name: default                     # Experiment name for logging and model saving
+  number: 0                         # Experiment number for tracking different runs - set dynamically
   save_name: null                   # Custom name used for saving model/prediction files - set dynamically
+
+
+# ----------------------------
+# Model Configuration
+# ----------------------------
+model: 
+  identifier: yolo                  # Model name identifier
+  conf_threshold: 0.25              # Confidence threshold for filtering weak detections
+  iou_threshold: 0.45               # Intersection over Union (IoU) threshold for Non-Maximum Suppression (NMS)
+
+  saved_model_folder: null         # Save folder name for a previously trained model - set dynamically
+
 
 
 # ----------------------------
